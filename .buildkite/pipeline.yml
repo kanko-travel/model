@@ -1,0 +1,6 @@
+steps:
+    - label: Run Unit Tests
+      commands:
+          - |
+              # Run unit tests
+              cargo test
