@@ -102,7 +102,7 @@ pub fn model_derive(input: TokenStream) -> TokenStream {
             let nullable = nesting > 0;
 
             let field_definition = quote! {
-                query::FieldDefinition {
+                model::FieldDefinition {
                     name: String::from(#name),
                     type_: #field_type,
                     immutable: #immutable,
@@ -123,11 +123,11 @@ pub fn model_derive(input: TokenStream) -> TokenStream {
             let return_result_field_value = if json {
                 quote! {
                     if let Some(value) = value {
-                        let value = query::serde_json::to_value(value).map_err(|_| query::Error::bad_request("unable to serialize field into json"))?;
+                        let value = model::serde_json::to_value(value).map_err(|_| model::Error::bad_request("unable to serialize field into json"))?;
                         return Ok(Some(value).into());
                     }
 
-                    Ok(query::FieldValue::Json(None))
+                    Ok(model::FieldValue::Json(None))
                 }
             } else {
                 quote! {
@@ -149,7 +149,7 @@ pub fn model_derive(input: TokenStream) -> TokenStream {
         .unzip();
 
     let gen = quote! {
-        impl #impl_generics query::Model for #ident #type_generics #where_clause {
+        impl #impl_generics model::Model for #ident #type_generics #where_clause {
             fn table_name() -> String {
                 #table_name.into()
             }
@@ -158,7 +158,7 @@ pub fn model_derive(input: TokenStream) -> TokenStream {
                 #id_field_string.into()
             }
 
-            fn field_definitions() -> Vec<query::FieldDefinition> {
+            fn field_definitions() -> Vec<model::FieldDefinition> {
                 vec![#(#field_definitions),*]
             }
 
@@ -166,10 +166,10 @@ pub fn model_derive(input: TokenStream) -> TokenStream {
                 self.#id_field.clone()
             }
 
-            fn field_value(&self, field: &str) -> Result<query::FieldValue, query::Error> {
+            fn field_value(&self, field: &str) -> Result<model::FieldValue, model::Error> {
                 match field {
                     #(#field_value_getters)*
-                    _ => Err(query::Error::bad_request("invalid field name"))
+                    _ => Err(model::Error::bad_request("invalid field name"))
                 }
             }
         }
@@ -211,7 +211,7 @@ fn map_field_type(
                     panic!("Field declared as id must be of type Uuid")
                 }
 
-                return (quote!(query::FieldType::Uuid), level);
+                return (quote!(model::FieldType::Uuid), level);
             }
 
             if ident == "Option" {
@@ -229,7 +229,7 @@ fn map_field_type(
                 panic!("unsupported field type")
             } else {
                 if json {
-                    (quote!(query::FieldType::Json), level)
+                    (quote!(model::FieldType::Json), level)
                 } else {
                     (map_field_inner_type(&ident), level)
                 }
@@ -241,14 +241,14 @@ fn map_field_type(
 
 fn map_field_inner_type(inner_type: &str) -> proc_macro2::TokenStream {
     match inner_type {
-        "Uuid" => quote! { query::FieldType::Uuid },
-        "bool" => quote! { query::FieldType::Bool },
-        "i64" => quote! { query::FieldType::Int },
-        "f64" => quote! { query::FieldType::Float },
-        "Decimal" => quote! { query::FieldType::Decimal },
-        "String" => quote! { query::FieldType::String },
-        "NaiveDate" => quote! { query::FieldType::Date },
-        "DateTime" => quote! { query::FieldType::DateTime },
+        "Uuid" => quote! { model::FieldType::Uuid },
+        "bool" => quote! { model::FieldType::Bool },
+        "i64" => quote! { model::FieldType::Int },
+        "f64" => quote! { model::FieldType::Float },
+        "Decimal" => quote! { model::FieldType::Decimal },
+        "String" => quote! { model::FieldType::String },
+        "NaiveDate" => quote! { model::FieldType::Date },
+        "DateTime" => quote! { model::FieldType::DateTime },
         _ => panic!("unsupported field type: {}", inner_type), // Default or error
     }
 }

@@ -179,7 +179,7 @@ mod test {
     use chrono::NaiveDate;
     use uuid::Uuid;
 
-    use crate::{self as query};
+    use crate::{self as model};
 
     use super::*;
 

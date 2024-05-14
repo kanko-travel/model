@@ -220,7 +220,7 @@ fn parse_cursor(cursor: &str, value_type: Option<&FieldType>) -> Result<Cursor, 
 
 #[cfg(test)]
 mod test {
-    use crate as query;
+    use crate as model;
     use crate::Cursor;
     use crate::FieldValue;
     use crate::Model;
