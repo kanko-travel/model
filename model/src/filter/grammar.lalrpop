@@ -28,7 +28,7 @@ Comp: Box<Expr> = {
 		})?;
 
 		let val: FieldValue = if let Some(val) = val {
-			match def.type_ {
+			match &def.type_ {
 				FieldType::Uuid => Uuid::parse_str(&val).map_err(|_| ParseError::User {
 					error: "invalid uuid"
 				})?.into(),
@@ -51,6 +51,13 @@ Comp: Box<Expr> = {
 				FieldType::DateTime => DateTime::parse_from_rfc3339(&val).map_err(|_| ParseError::User {
 					error: "invalid datetime"
 				})?.into(),
+				FieldType::Enum(variants) => {
+					variants.iter().find(|&v| v == &val).ok_or_else(|| ParseError::User {
+						error: "invalid enum variant"
+					})?;
+
+					FieldValue::Enum(val.to_string().into())
+				},
 				FieldType::Json => {
 					return Err(ParseError::User {
 						error: "illegal field: can't filter by json field"
