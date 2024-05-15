@@ -51,6 +51,12 @@ impl Display for Error {
     }
 }
 
+impl std::error::Error for Error {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        None
+    }
+}
+
 impl From<sqlx::Error> for Error {
     fn from(err: sqlx::Error) -> Self {
         match err {

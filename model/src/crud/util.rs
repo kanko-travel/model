@@ -48,6 +48,7 @@ pub fn bind_query<'a>(
         FieldValue::String(inner) => q.bind(inner),
         FieldValue::Date(inner) => q.bind(inner),
         FieldValue::DateTime(inner) => q.bind(inner),
+        FieldValue::Enum(inner) => q.bind(inner),
         FieldValue::Json(inner) => q.bind(Json(inner)),
     }
 }
@@ -65,6 +66,7 @@ pub fn bind_query_as<'a, T>(
         FieldValue::String(inner) => q.bind(inner),
         FieldValue::Date(inner) => q.bind(inner),
         FieldValue::DateTime(inner) => q.bind(inner),
+        FieldValue::Enum(inner) => q.bind(inner),
         FieldValue::Json(inner) => q.bind(Json(inner)),
     }
 }

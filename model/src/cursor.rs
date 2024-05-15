@@ -32,6 +32,7 @@ impl Serialize for Cursor {
                 FieldValue::String(v) => to_b64_str(v),
                 FieldValue::Date(v) => to_b64_str(v),
                 FieldValue::DateTime(v) => to_b64_str(v),
+                FieldValue::Enum(v) => to_b64_str(v),
                 FieldValue::Json(_) => {
                     return Err(serde::ser::Error::custom(Error::bad_request(
                         "can't serialize cursor that has a json value",

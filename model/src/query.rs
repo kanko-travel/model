@@ -204,6 +204,15 @@ fn parse_cursor(cursor: &str, value_type: Option<&FieldType>) -> Result<Cursor, 
             FieldType::String => FieldValue::String(from_b64_str(value)?),
             FieldType::Date => FieldValue::Date(from_b64_str(value)?),
             FieldType::DateTime => FieldValue::DateTime(from_b64_str(value)?),
+            FieldType::Enum(variants) => {
+                let value: String = from_b64_str(value)?;
+
+                variants.iter().find(|&v| v == &value).ok_or_else(|| {
+                    Error::bad_request("invalid cursor value: not a recognized enum variant")
+                })?;
+
+                FieldValue::Enum(value.into())
+            }
             FieldType::Json => {
                 return Err(Error::bad_request(
                     "invalid cursor value: json value can't be used as cursor value",

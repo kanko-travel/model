@@ -3,7 +3,7 @@ use rust_decimal::Decimal;
 use serde_json::Value;
 use uuid::Uuid;
 
-use crate::FieldType;
+use crate::Enum;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum FieldValue {
@@ -16,22 +16,7 @@ pub enum FieldValue {
     Date(Option<NaiveDate>),
     DateTime(Option<DateTime<Utc>>),
     Json(Option<Value>),
-}
-
-impl FieldValue {
-    pub fn field_type(&self) -> FieldType {
-        match self {
-            Self::Uuid(_) => FieldType::Uuid,
-            Self::Bool(_) => FieldType::Bool,
-            Self::Int(_) => FieldType::Int,
-            Self::Float(_) => FieldType::Float,
-            Self::Decimal(_) => FieldType::Decimal,
-            Self::String(_) => FieldType::String,
-            Self::Date(_) => FieldType::Date,
-            Self::DateTime(_) => FieldType::DateTime,
-            Self::Json(_) => FieldType::Json,
-        }
-    }
+    Enum(Option<String>),
 }
 
 impl ToString for FieldValue {
@@ -46,6 +31,7 @@ impl ToString for FieldValue {
             Self::Date(Some(inner)) => inner.to_string(),
             Self::DateTime(Some(inner)) => inner.to_rfc3339(),
             Self::Json(Some(inner)) => inner.to_string(),
+            Self::Enum(Some(inner)) => inner.to_string(),
             _ => "null".to_string(),
         }
     }
@@ -119,6 +105,15 @@ impl From<Value> for FieldValue {
     }
 }
 
+impl<T> From<T> for FieldValue
+where
+    T: Enum,
+{
+    fn from(value: T) -> Self {
+        Self::Enum(value.to_string().into())
+    }
+}
+
 impl From<Option<Uuid>> for FieldValue {
     fn from(value: Option<Uuid>) -> Self {
         Self::Uuid(value)
@@ -182,5 +177,14 @@ impl From<Option<DateTime<FixedOffset>>> for FieldValue {
 impl From<Option<Value>> for FieldValue {
     fn from(value: Option<Value>) -> Self {
         Self::Json(value)
+    }
+}
+
+impl<T> From<Option<T>> for FieldValue
+where
+    T: Enum,
+{
+    fn from(value: Option<T>) -> Self {
+        Self::Enum(value.map(|v| v.to_string()))
     }
 }

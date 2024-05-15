@@ -53,7 +53,7 @@ pub fn model_derive(input: TokenStream) -> TokenStream {
 
     let mut id_field: Option<Ident> = None;
     let mut primary_key_set = false;
-    while let Some((f, (id, _, _, _, primary_key, _))) = field_attributes.next() {
+    while let Some((f, (id, _, _, _, primary_key, _, _))) = field_attributes.next() {
         if id && id_field.is_some() {
             panic!("only one field may be declared as the id field")
         }
@@ -81,7 +81,7 @@ pub fn model_derive(input: TokenStream) -> TokenStream {
         .filter_map(|f| {
             let name_ident = f.ident.as_ref().unwrap();
             let name = name_ident.to_string();
-            let (id, json, skip, immutable, primary_key, unique) = parse_attributes(&f.attrs);
+            let (id, json, skip, immutable, primary_key, unique, enum_) = parse_attributes(&f.attrs);
 
             if id {
                 if skip {
@@ -97,7 +97,7 @@ pub fn model_derive(input: TokenStream) -> TokenStream {
                 return None;
             }
 
-            let (field_type, nesting) = map_field_type(&f.ty, id, json, 0);
+            let (field_type, nesting) = map_field_type(&f.ty, id, json, enum_, 0);
 
             let nullable = nesting > 0;
 
@@ -197,6 +197,7 @@ fn map_field_type(
     ty: &syn::Type,
     id: bool,
     json: bool,
+    enum_: bool,
     level: usize,
 ) -> (proc_macro2::TokenStream, usize) {
     use syn::{Type, TypePath};
@@ -204,17 +205,18 @@ fn map_field_type(
     match ty {
         Type::Path(TypePath { path, .. }) => {
             let last_segment = path.segments.last().unwrap();
-            let ident = last_segment.ident.to_string();
+            let ident = &last_segment.ident;
+            let ident_str = ident.to_string();
 
             if id {
-                if &ident != "Uuid" {
+                if ident_str != "Uuid" {
                     panic!("Field declared as id must be of type Uuid")
                 }
 
                 return (quote!(model::FieldType::Uuid), level);
             }
 
-            if ident == "Option" {
+            if ident_str == "Option" {
                 if let PathArguments::AngleBracketed(angle_bracketed_param) =
                     &last_segment.arguments
                 {
@@ -222,7 +224,7 @@ fn map_field_type(
                         angle_bracketed_param.args.first()
                     {
                         // Handle the inner type, which might be a complex path
-                        return map_field_type(inner_type, id, json, level + 1);
+                        return map_field_type(inner_type, id, json, enum_, level + 1);
                     }
                 }
 
@@ -231,7 +233,7 @@ fn map_field_type(
                 if json {
                     (quote!(model::FieldType::Json), level)
                 } else {
-                    (map_field_inner_type(&ident), level)
+                    (map_field_inner_type(ident, enum_), level)
                 }
             }
         }
@@ -239,8 +241,15 @@ fn map_field_type(
     }
 }
 
-fn map_field_inner_type(inner_type: &str) -> proc_macro2::TokenStream {
-    match inner_type {
+fn map_field_inner_type(inner_type: &Ident, enum_: bool) -> proc_macro2::TokenStream {
+    // handle the enum case if the enum attribute is set
+    if enum_ {
+        return quote! {
+            model::FieldType::Enum(#inner_type::variants())
+        };
+    }
+
+    match inner_type.to_string().as_str() {
         "Uuid" => quote! { model::FieldType::Uuid },
         "bool" => quote! { model::FieldType::Bool },
         "i64" => quote! { model::FieldType::Int },
@@ -249,17 +258,19 @@ fn map_field_inner_type(inner_type: &str) -> proc_macro2::TokenStream {
         "String" => quote! { model::FieldType::String },
         "NaiveDate" => quote! { model::FieldType::Date },
         "DateTime" => quote! { model::FieldType::DateTime },
-        _ => panic!("unsupported field type: {}", inner_type), // Default or error
+        _ => panic!("unsupported field type: {}. If this is an Enum, please mark the field with the enum attribute: #[model(enum)]", inner_type), // Default or error
     }
 }
 
-fn parse_attributes(attrs: &[Attribute]) -> (bool, bool, bool, bool, bool, bool) {
+fn parse_attributes(attrs: &[Attribute]) -> (bool, bool, bool, bool, bool, bool, bool) {
     let mut id = false;
     let mut json = false;
     let mut skip = false;
     let mut immutable = false;
     let mut primary_key = false;
     let mut unique = false;
+    let mut enum_ = false;
+
     for attr in attrs {
         if let Ok(Meta::List(meta)) = attr.parse_meta() {
             if meta.path.is_ident("model") {
@@ -284,6 +295,9 @@ fn parse_attributes(attrs: &[Attribute]) -> (bool, bool, bool, bool, bool, bool)
                         syn::NestedMeta::Meta(Meta::Path(path)) if path.is_ident("unique") => {
                             unique = true;
                         }
+                        syn::NestedMeta::Meta(Meta::Path(path)) if path.is_ident("enum") => {
+                            enum_ = true;
+                        }
                         _ => {}
                     }
                 }
@@ -291,5 +305,5 @@ fn parse_attributes(attrs: &[Attribute]) -> (bool, bool, bool, bool, bool, bool)
         }
     }
 
-    (id, json, skip, immutable, primary_key, unique)
+    (id, json, skip, immutable, primary_key, unique, enum_)
 }
