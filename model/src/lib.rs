@@ -5,6 +5,7 @@ mod error;
 mod field_value;
 mod migration;
 mod model;
+mod pgoutput;
 mod query;
 mod util;
 

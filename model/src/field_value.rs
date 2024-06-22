@@ -1,11 +1,12 @@
 use chrono::{DateTime, FixedOffset, NaiveDate, Utc};
 use rust_decimal::Decimal;
+use serde::Serialize;
 use serde_json::Value;
 use uuid::Uuid;
 
 use crate::Enum;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize)]
 pub enum FieldValue {
     Uuid(Option<Uuid>),
     Bool(Option<bool>),
