@@ -20,5 +20,6 @@ pub use filter::builder::Filter;
 pub use migration::Migration;
 pub use model::*;
 pub use model_derive::Model;
+pub use pgoutput::FromPgoutput;
 pub use query::*;
 pub use sqlx;
