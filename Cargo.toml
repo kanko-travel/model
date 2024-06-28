@@ -2,7 +2,7 @@
 
 resolver = "2"
 
-members = ["enum_derive", "model", "model_derive"]
+members = ["enum_derive", "model", "model_derive", "model_wrapper"]
 
 [workspace.dependencies]
 async-trait = "0.1"
@@ -27,4 +27,5 @@ lalrpop-util = { version = "0.20", features = ["lexer", "unicode"] }
 tokio = { version = "1.2", features = ["full"] }
 
 model_derive = { path = "model_derive" }
+model_wrapper = { path = "model_wrapper" }
 enum_derive = { path = "enum_derive" }
