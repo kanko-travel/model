@@ -20,6 +20,7 @@ pub use filter::builder::Filter;
 pub use migration::Migration;
 pub use model::*;
 pub use model_derive::Model;
+pub use model_wrapper::model_wrapper;
 pub use pgoutput::FromPgoutput;
 pub use query::*;
 pub use sqlx;

@@ -7,6 +7,7 @@ use uuid::Uuid;
 use crate::Enum;
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(untagged)]
 pub enum FieldValue {
     Uuid(Option<Uuid>),
     Bool(Option<bool>),

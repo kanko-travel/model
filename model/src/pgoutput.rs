@@ -10,7 +10,7 @@ use uuid::Uuid;
 use crate::{Error, FieldDefinitionMap, FieldType, FieldValue, Model};
 
 pub trait FromPgoutput {
-    fn from_pgoutput(row: Vec<Option<String>>, column_names: &Vec<String>) -> Result<Self, Error>
+    fn from_pgoutput(col_names: &Vec<String>, row: Vec<Option<String>>) -> Result<Self, Error>
     where
         Self: Sized;
 }
@@ -19,11 +19,11 @@ impl<T> FromPgoutput for T
 where
     T: Model + for<'de> Deserialize<'de>,
 {
-    fn from_pgoutput(row: Vec<Option<String>>, column_names: &Vec<String>) -> Result<Self, Error>
+    fn from_pgoutput(col_names: &Vec<String>, row: Vec<Option<String>>) -> Result<Self, Error>
     where
         Self: Sized,
     {
-        if row.len() != column_names.len() {
+        if row.len() != col_names.len() {
             return Err(Error::bad_request(
                 "column names and values must have the same length",
             ));
@@ -33,7 +33,7 @@ where
 
         let mut map = HashMap::new();
 
-        for (i, column_name) in column_names.iter().enumerate() {
+        for (i, column_name) in col_names.iter().enumerate() {
             let def = field_defs
                 .0
                 .get(column_name)
@@ -85,11 +85,18 @@ where
                 def.type_.null_value()
             };
 
-            map.insert(column_name, value);
+            map.insert(column_name, json!(value));
         }
 
-        let t = serde_json::from_value(json!(map))
-            .map_err(|_| Error::bad_request("couldn't deserialize pgoutput into expected type"))?;
+        println!("{:?}", map);
+
+        let t = serde_json::from_value(json!(map)).map_err(|err| {
+            Error::bad_request(&format!(
+                "couldn't deserialize pgoutput into expected type: {:?}",
+                err
+            ))
+        })?;
+
         Ok(t)
     }
 }

@@ -18,6 +18,7 @@ base64.workspace = true
 sqlx.workspace = true
 lalrpop-util.workspace = true
 
+model_wrapper.workspace = true
 model_derive.workspace = true
 enum_derive.workspace = true
 
