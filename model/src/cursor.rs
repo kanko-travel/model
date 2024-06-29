@@ -27,6 +27,7 @@ impl Serialize for Cursor {
                 FieldValue::Uuid(v) => to_b64_str(v),
                 FieldValue::Bool(v) => to_b64_str(v),
                 FieldValue::Int(v) => to_b64_str(v),
+                FieldValue::Int32(v) => to_b64_str(v),
                 FieldValue::Float(v) => to_b64_str(v),
                 FieldValue::Decimal(v) => to_b64_str(v),
                 FieldValue::String(v) => to_b64_str(v),

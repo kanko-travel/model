@@ -53,6 +53,9 @@ where
                     FieldType::Int => i64::from_str(&val)
                         .map_err(|_| Error::bad_request("invalid int"))?
                         .into(),
+                    FieldType::Int32 => i32::from_str(&val)
+                        .map_err(|_| Error::bad_request("invalid int"))?
+                        .into(),
                     FieldType::Float => f64::from_str(&val)
                         .map_err(|_| Error::bad_request("invalid message"))?
                         .into(),
