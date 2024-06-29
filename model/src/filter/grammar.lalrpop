@@ -38,6 +38,9 @@ Comp: Box<Expr> = {
 				FieldType::Int => i64::from_str(&val).map_err(|_| ParseError::User {
 					error: "invalid int"
 				})?.into(),
+				FieldType::Int32 => i32::from_str(&val).map_err(|_| ParseError::User {
+					error: "invalid int32"
+				})?.into(),
 				FieldType::Float => f64::from_str(&val).map_err(|_| ParseError::User {
 					error: "invalid float"
 				})?.into(),

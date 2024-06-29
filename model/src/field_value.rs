@@ -12,6 +12,7 @@ pub enum FieldValue {
     Uuid(Option<Uuid>),
     Bool(Option<bool>),
     Int(Option<i64>),
+    Int32(Option<i32>),
     Float(Option<f64>),
     Decimal(Option<Decimal>),
     String(Option<String>),
@@ -60,6 +61,12 @@ impl From<bool> for FieldValue {
 impl From<i64> for FieldValue {
     fn from(value: i64) -> Self {
         Self::Int(value.into())
+    }
+}
+
+impl From<i32> for FieldValue {
+    fn from(value: i32) -> Self {
+        Self::Int32(value.into())
     }
 }
 
@@ -131,6 +138,12 @@ impl From<Option<bool>> for FieldValue {
 impl From<Option<i64>> for FieldValue {
     fn from(value: Option<i64>) -> Self {
         Self::Int(value)
+    }
+}
+
+impl From<Option<i32>> for FieldValue {
+    fn from(value: Option<i32>) -> Self {
+        Self::Int32(value)
     }
 }
 

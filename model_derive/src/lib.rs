@@ -253,6 +253,7 @@ fn map_field_inner_type(inner_type: &Ident, enum_: bool) -> proc_macro2::TokenSt
         "Uuid" => quote! { model::FieldType::Uuid },
         "bool" => quote! { model::FieldType::Bool },
         "i64" => quote! { model::FieldType::Int },
+        "i32" => quote! { model::FieldType::Int32 },
         "f64" => quote! { model::FieldType::Float },
         "Decimal" => quote! { model::FieldType::Decimal },
         "String" => quote! { model::FieldType::String },
