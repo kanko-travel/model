@@ -28,6 +28,7 @@ impl ToString for FieldValue {
             Self::Uuid(Some(inner)) => inner.to_string(),
             Self::Bool(Some(inner)) => inner.to_string(),
             Self::Int(Some(inner)) => inner.to_string(),
+            Self::Int32(Some(inner)) => inner.to_string(),
             Self::Float(Some(inner)) => inner.to_string(),
             Self::Decimal(Some(inner)) => inner.to_string(),
             Self::String(Some(inner)) => inner.to_string(),
