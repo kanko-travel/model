@@ -24,7 +24,8 @@ pub struct PageInfo {
 impl<T: JsonSchema> JsonSchema for Connection<T> {
     fn schema_name() -> String {
         // Exclude the module path to make the name in generated schemas clearer.
-        format!("Connection_{}", T::schema_name())
+        // format!("Connection_{}", T::schema_name())
+        format!("{}Connection", T::schema_name())
     }
 
     fn schema_id() -> Cow<'static, str> {

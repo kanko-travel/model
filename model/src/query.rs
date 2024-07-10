@@ -93,15 +93,17 @@ impl<'de, T: Model> Deserialize<'de> for Query<T> {
     }
 }
 
-impl<T: Model> JsonSchema for Query<T> {
+impl<T: Model + JsonSchema> JsonSchema for Query<T> {
     fn schema_name() -> String {
         // Exclude the module path to make the name in generated schemas clearer.
-        "Query".to_owned()
+        // "Query".to_owned()
+        format!("{}Query", T::schema_name())
     }
 
     fn schema_id() -> Cow<'static, str> {
         // Include the module, in case a type with the same name is in another module/crate
-        Cow::Borrowed(concat!(module_path!(), "::Query"))
+        // Cow::Borrowed(concat!(module_path!(), "::Query"))
+        Cow::Owned(format!("{}::Query<{}>", module_path!(), T::schema_id()))
     }
 
     fn json_schema(gen: &mut SchemaGenerator) -> Schema {

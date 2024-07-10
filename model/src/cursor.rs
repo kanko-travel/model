@@ -57,7 +57,8 @@ impl JsonSchema for Cursor {
 
     fn schema_id() -> Cow<'static, str> {
         // Include the module, in case a type with the same name is in another module/crate
-        Cow::Borrowed(concat!(module_path!(), "::Cursor"))
+        // Cow::Borrowed(concat!(module_path!(), "::Cursor"))
+        Cow::Owned(format!("{}::Cursor", module_path!()))
     }
 
     fn json_schema(_gen: &mut SchemaGenerator) -> Schema {
