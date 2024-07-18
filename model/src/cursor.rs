@@ -7,13 +7,22 @@ use schemars::{
     JsonSchema,
 };
 use serde::{Serialize, Serializer};
-use std::borrow::Cow;
+use std::{borrow::Cow, cmp::Ordering};
 use uuid::Uuid;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Cursor {
     pub value: Option<FieldValue>,
     pub id: Uuid,
+}
+
+impl PartialOrd for Cursor {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        match self.value.partial_cmp(&other.value) {
+            Some(Ordering::Equal) | None => self.id.partial_cmp(&other.id),
+            Some(ordering) => Some(ordering),
+        }
+    }
 }
 
 impl Serialize for Cursor {

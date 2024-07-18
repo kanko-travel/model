@@ -19,6 +19,7 @@ pub struct Connection<T> {
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 pub struct PageInfo {
     pub next_cursor: Option<Cursor>,
+    pub prev_cursor: Option<Cursor>,
 }
 
 impl<T: JsonSchema> JsonSchema for Connection<T> {
