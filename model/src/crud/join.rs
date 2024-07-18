@@ -73,29 +73,23 @@ where
     F: Model,
 {
     pub async fn fetch_page(&self, executor: &mut PgConnection) -> Result<Connection<S>, Error> {
-        let nodes = self.fetch_all(executor).await?;
-
-        self.select.paginate(nodes)
-    }
-
-    pub async fn fetch_all(&self, executor: &mut PgConnection) -> Result<Vec<S>, Error> {
         let filters = self.select.build_filters_with_foreign::<F>()?;
         let select_clause = self.prepare_select_clause();
 
-        let (statement, var_bindings) = self.select.prepare(filters, select_clause.into());
+        let (statement, var_bindings) = self.select.prepare(filters, select_clause.into())?;
 
-        let result = build_query_as::<S>(&statement, var_bindings)
+        let nodes = build_query_as::<S>(&statement, var_bindings)
             .fetch_all(executor)
             .await?;
 
-        Ok(result)
+        self.select.paginate(nodes)
     }
 
     pub async fn fetch_one(&self, executor: &mut PgConnection) -> Result<S, Error> {
         let filters = self.select.build_filters_with_foreign::<F>()?;
         let select_clause = self.prepare_select_clause();
 
-        let (statement, var_bindings) = self.select.prepare(filters, select_clause.into());
+        let (statement, var_bindings) = self.select.prepare(filters, select_clause.into())?;
 
         let result = build_query_as::<S>(&statement, var_bindings)
             .fetch_one(executor)
@@ -108,7 +102,7 @@ where
         let filters = self.select.build_filters_with_foreign::<F>()?;
         let select_clause = self.prepare_select_clause();
 
-        let (statement, var_bindings) = self.select.prepare(filters, select_clause.into());
+        let (statement, var_bindings) = self.select.prepare(filters, select_clause.into())?;
 
         let result = build_query_as::<S>(&statement, var_bindings)
             .fetch_optional(executor)

@@ -1,3 +1,5 @@
+use std::cmp::Ordering;
+
 use chrono::{DateTime, FixedOffset, NaiveDate, Utc};
 use rust_decimal::Decimal;
 use serde::Serialize;
@@ -20,6 +22,74 @@ pub enum FieldValue {
     DateTime(Option<DateTime<Utc>>),
     Json(Option<Value>),
     Enum(Option<String>),
+}
+
+impl PartialOrd for FieldValue {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        match (self, other) {
+            (Self::Uuid(a), Self::Uuid(b)) => match (a, b) {
+                (Some(a), Some(b)) => a.partial_cmp(b),
+                (None, Some(_)) => Some(Ordering::Less),
+                (Some(_), None) => Some(Ordering::Greater),
+                (None, None) => Some(Ordering::Equal),
+            },
+            (Self::Bool(a), Self::Bool(b)) => match (a, b) {
+                (Some(a), Some(b)) => a.partial_cmp(b),
+                (None, Some(_)) => Some(Ordering::Less),
+                (Some(_), None) => Some(Ordering::Greater),
+                (None, None) => Some(Ordering::Equal),
+            },
+            (Self::Int(a), Self::Int(b)) => match (a, b) {
+                (Some(a), Some(b)) => a.partial_cmp(b),
+                (None, Some(_)) => Some(Ordering::Less),
+                (Some(_), None) => Some(Ordering::Greater),
+                (None, None) => Some(Ordering::Equal),
+            },
+            (Self::Int32(a), Self::Int32(b)) => match (a, b) {
+                (Some(a), Some(b)) => a.partial_cmp(b),
+                (None, Some(_)) => Some(Ordering::Less),
+                (Some(_), None) => Some(Ordering::Greater),
+                (None, None) => Some(Ordering::Equal),
+            },
+            (Self::Float(a), Self::Float(b)) => match (a, b) {
+                (Some(a), Some(b)) => a.partial_cmp(b),
+                (None, Some(_)) => Some(Ordering::Less),
+                (Some(_), None) => Some(Ordering::Greater),
+                (None, None) => Some(Ordering::Equal),
+            },
+            (Self::Decimal(a), Self::Decimal(b)) => match (a, b) {
+                (Some(a), Some(b)) => a.partial_cmp(b),
+                (None, Some(_)) => Some(Ordering::Less),
+                (Some(_), None) => Some(Ordering::Greater),
+                (None, None) => Some(Ordering::Equal),
+            },
+            (Self::String(a), Self::String(b)) => match (a, b) {
+                (Some(a), Some(b)) => a.partial_cmp(b),
+                (None, Some(_)) => Some(Ordering::Less),
+                (Some(_), None) => Some(Ordering::Greater),
+                (None, None) => Some(Ordering::Equal),
+            },
+            (Self::Date(a), Self::Date(b)) => match (a, b) {
+                (Some(a), Some(b)) => a.partial_cmp(b),
+                (None, Some(_)) => Some(Ordering::Less),
+                (Some(_), None) => Some(Ordering::Greater),
+                (None, None) => Some(Ordering::Equal),
+            },
+            (Self::DateTime(a), Self::DateTime(b)) => match (a, b) {
+                (Some(a), Some(b)) => a.partial_cmp(b),
+                (None, Some(_)) => Some(Ordering::Less),
+                (Some(_), None) => Some(Ordering::Greater),
+                (None, None) => Some(Ordering::Equal),
+            },
+            (Self::Enum(a), Self::Enum(b)) => match (a, b) {
+                (Some(a), Some(b)) => a.partial_cmp(b),
+                (None, Some(_)) => Some(Ordering::Less),
+                (Some(_), None) => Some(Ordering::Greater),
+                (None, None) => Some(Ordering::Equal),
+            },
+            _ => None,
+        }
+    }
 }
 
 impl ToString for FieldValue {
