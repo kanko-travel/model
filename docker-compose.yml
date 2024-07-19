@@ -16,15 +16,15 @@ services:
       -c wal_level=logical
       -c max_wal_senders=5
       -c max_replication_slots=5
-    app:
-      build:
-        context: .
-        dockerfile: Dockerfile
-      working_dir: /app
-      volumes:
-        - .:/app
-      depends_on:
-        - postgres-model
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    working_dir: /app
+    volumes:
+      - .:/app
+    depends_on:
+      - postgres-model
 volumes:
   postgres_data:
     driver: local
