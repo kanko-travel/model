@@ -1,5 +1,5 @@
 steps:
-    - name: "Run Tests"
+    - label: Run Tests
     command: test.sh
     plugins:
         - docker-compose#v3.0.3:
