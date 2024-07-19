@@ -5,8 +5,10 @@ services:
       POSTGRES_DB: "model"
       POSTGRES_USER: "model"
       POSTGRES_PASSWORD: "model"
-    ports:
-      - "5432:5432"
+    # ports:
+    #   - "5432:5432"
+    expose:
+      - "5432"
     volumes:
       - postgres_data:/var/lib/model/postgresql/data
     command: |
@@ -14,6 +16,15 @@ services:
       -c wal_level=logical
       -c max_wal_senders=5
       -c max_replication_slots=5
+    app:
+      build:
+        context: .
+        dockerfile: Dockerfile
+      working_dir: /app
+      volumes:
+        - .:/app
+      depends_on:
+        - postgres-model
 volumes:
   postgres_data:
     driver: local
