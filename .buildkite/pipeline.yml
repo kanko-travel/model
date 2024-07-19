@@ -1,5 +1,13 @@
 steps:
-    - command: ./test.sh
+    - label: ":docker: Build"
       plugins:
-          - docker-compose#v3.0.3:
+          - docker-compose#v5.2.0:
+                build: app
+                push: app
+
+    - wait
+    - label: "Run tests"
+      command: ./test.sh
+      plugins:
+          - docker-compose#v5.2.0:
                 run: app
