@@ -7,6 +7,12 @@ steps:
     - label: Run Unit Tests
       commands:
           - |
+              # Install dependencies
+              apt-get update && apt-get -y install clang libclang-dev cmake ca-certificates libssl-dev && rm -rf /var/lib/apt/lists/*
+
+              # Install rust and cargo
+              rustup default stable && rustup update
+
               # Run unit tests
               cargo test
     - label: Stop Test Database

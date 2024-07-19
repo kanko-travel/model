@@ -5,10 +5,8 @@ services:
       POSTGRES_DB: "model"
       POSTGRES_USER: "model"
       POSTGRES_PASSWORD: "model"
-    # ports:
-    #   - "5432:5432"
-    expose:
-      - "5432"
+    ports:
+      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/model/postgresql/data
     command: |
