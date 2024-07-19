@@ -1,16 +1,16 @@
 steps:
     - label: Start Test Database
-        commands:
-            - |
-                # Start database via docker-compose
-                docker-compose -f .buildkite/docker-compose.yml up -d
+    commands:
+        - |
+            # Start database via docker-compose
+            docker-compose -f .buildkite/docker-compose.yml up -d
     - label: Run Unit Tests
-        commands:
-            - |
-                # Run unit tests
-                cargo test
+    commands:
+        - |
+            # Run unit tests
+            cargo test
     - label: Stop Test Database
-        commands:
-            - |
-                # Stop database via docker-compose
-                docker-compose -f .buildkite/docker-compose.yml down
+    commands:
+        - |
+            # Stop database via docker-compose
+            docker-compose -f .buildkite/docker-compose.yml down
