@@ -50,6 +50,8 @@ pub enum CompOp {
     Gte,
     Lt,
     Lte,
+    Like,
+    Ilike,
 }
 
 impl CompOp {
@@ -61,6 +63,8 @@ impl CompOp {
             Self::Gte => ">=",
             Self::Lt => "<",
             Self::Lte => "<=",
+            Self::Like => "LIKE",
+            Self::Ilike => "ILIKE",
         }
         .into()
     }
@@ -75,6 +79,8 @@ impl ToString for CompOp {
             Self::Gte => ">=",
             Self::Lt => "<",
             Self::Lte => "<=",
+            Self::Like => "LIKE",
+            Self::Ilike => "ILIKE",
         }
         .into()
     }
@@ -155,6 +161,8 @@ impl TryInto<Filter> for Expr {
                             CompOp::Gte => Filter::new().field(&var).gte(val),
                             CompOp::Lt => Filter::new().field(&var).lt(val),
                             CompOp::Lte => Filter::new().field(&var).lte(val),
+                            CompOp::Like => Filter::new().field(&var).like(val),
+                            CompOp::Ilike => Filter::new().field(&var).ilike(val),
                         },
                         _ => return Err(Error::internal("invalid filter expression: this should not happen as any errors should have been caught during parsing of the expression")) 
                     },
