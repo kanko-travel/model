@@ -78,6 +78,20 @@ impl Filter {
         self
     }
 
+    pub fn like(mut self, val: impl Into<FieldValue>) -> Self {
+        self.tokens.push(Token::CompOp(CompOp::Like));
+        self.tokens.push(Token::Val(val.into()));
+
+        self
+    }
+
+    pub fn ilike(mut self, val: impl Into<FieldValue>) -> Self {
+        self.tokens.push(Token::CompOp(CompOp::Ilike));
+        self.tokens.push(Token::Val(val.into()));
+
+        self
+    }
+
     pub fn not(mut self) -> Self {
         self.tokens.push(Token::LogicOp(LogicOp::Not));
 

@@ -86,6 +86,8 @@ CompOp: CompOp = {
 	">=" => CompOp::Gte,
 	"<"	=> CompOp::Lt,
 	"<=" => CompOp::Lte,
+	"LIKE" => CompOp::Like,
+	"ILIKE" => CompOp::Ilike,
 };
 
 Negation: Box<Expr> = {
