@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use uuid::Uuid;
 
+use crate::reference::Reference;
 use crate::Error;
 use crate::FieldValue;
 
@@ -53,12 +54,13 @@ pub enum FieldType {
     DateTime,
     Json,
     Enum(Vec<String>),
+    Reference(Reference),
 }
 
 impl FieldType {
     pub fn null_value(&self) -> FieldValue {
         match self {
-            Self::Uuid => FieldValue::Uuid(None),
+            Self::Uuid | Self::Reference(_) => FieldValue::Uuid(None),
             Self::Bool => FieldValue::Bool(None),
             Self::Int => FieldValue::Int(None),
             Self::Int32 => FieldValue::Int32(None),
@@ -74,7 +76,7 @@ impl FieldType {
 
     pub fn sql_type(&self) -> &'static str {
         match self {
-            Self::Uuid => "uuid",
+            Self::Uuid | Self::Reference(_) => "uuid",
             Self::Bool => "boolean",
             Self::Int => "int8",
             Self::Int32 => "int4",

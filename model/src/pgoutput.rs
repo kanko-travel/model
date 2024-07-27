@@ -44,7 +44,7 @@ where
             // decode the value into a serde_json::Value
             let value = if let Some(val) = value {
                 match &def.type_ {
-                    FieldType::Uuid => Uuid::parse_str(&val)
+                    FieldType::Uuid | FieldType::Reference(_) => Uuid::parse_str(&val)
                         .map_err(|_| Error::bad_request("invalid uuid"))?
                         .into(),
                     FieldType::Bool => bool::from_str(&val)

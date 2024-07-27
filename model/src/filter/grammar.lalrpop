@@ -29,7 +29,7 @@ Comp: Box<Expr> = {
 
 		let val: FieldValue = if let Some(val) = val {
 			match &def.type_ {
-				FieldType::Uuid => Uuid::parse_str(&val).map_err(|_| ParseError::User {
+				FieldType::Uuid | FieldType::Reference(_) => Uuid::parse_str(&val).map_err(|_| ParseError::User {
 					error: "invalid uuid"
 				})?.into(),
 				FieldType::Bool => bool::from_str(&val).map_err(|_| ParseError::User {
