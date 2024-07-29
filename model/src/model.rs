@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use uuid::Uuid;
 
-use crate::reference::Reference;
+use crate::relation::RelationDef;
 use crate::Error;
 use crate::FieldValue;
 
@@ -9,6 +9,13 @@ pub trait Model {
     fn table_name() -> String;
     fn id_field_name() -> String;
     fn field_definitions() -> Vec<FieldDefinition>;
+    /// Currently this method must be manually derived. Relations defined via
+    /// implementation of the Relation trait will still allow calling
+    /// relation methods in code. However, in order to allow queries involving
+    /// relations using the filter dsl, this method must return the referenced relations
+    fn relation_definitions() -> Vec<RelationDef> {
+        vec![]
+    }
     fn id_field_value(&self) -> Uuid;
     fn field_value(&self, field: &str) -> Result<FieldValue, Error>;
     fn fields(&self) -> Result<Vec<(FieldDefinition, FieldValue)>, Error> {
@@ -31,7 +38,7 @@ pub trait Enum: Sized {
     fn variants() -> Vec<String>;
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct FieldDefinition {
     pub name: String,
     pub type_: FieldType,
@@ -54,13 +61,12 @@ pub enum FieldType {
     DateTime,
     Json,
     Enum(Vec<String>),
-    Reference(Reference),
 }
 
 impl FieldType {
     pub fn null_value(&self) -> FieldValue {
         match self {
-            Self::Uuid | Self::Reference(_) => FieldValue::Uuid(None),
+            Self::Uuid => FieldValue::Uuid(None),
             Self::Bool => FieldValue::Bool(None),
             Self::Int => FieldValue::Int(None),
             Self::Int32 => FieldValue::Int32(None),
@@ -76,7 +82,7 @@ impl FieldType {
 
     pub fn sql_type(&self) -> &'static str {
         match self {
-            Self::Uuid | Self::Reference(_) => "uuid",
+            Self::Uuid => "uuid",
             Self::Bool => "boolean",
             Self::Int => "int8",
             Self::Int32 => "int4",

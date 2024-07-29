@@ -7,7 +7,7 @@ mod migration;
 mod model;
 mod pgoutput;
 mod query;
-mod reference;
+mod relation;
 mod util;
 
 pub(crate) mod filter;

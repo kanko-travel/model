@@ -198,7 +198,7 @@ fn parse_cursor(cursor: &str, value_type: Option<&FieldType>) -> Result<Cursor, 
             .ok_or_else(|| Error::bad_request("invalid cursor: expected value component"))?;
 
         match value_type {
-            FieldType::Uuid | FieldType::Reference(_) => FieldValue::Uuid(from_b64_str(value)?),
+            FieldType::Uuid => FieldValue::Uuid(from_b64_str(value)?),
             FieldType::Bool => FieldValue::Bool(from_b64_str(value)?),
             FieldType::Int => FieldValue::Int(from_b64_str(value)?),
             FieldType::Int32 => FieldValue::Int32(from_b64_str(value)?),
