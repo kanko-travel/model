@@ -4,13 +4,20 @@ use uuid::Uuid;
 use rust_decimal::Decimal;
 use chrono::{DateTime, NaiveDate};
 use lalrpop_util::ParseError;
-use crate::filter::ast::{Expr, LogicOp, CompOp};
+use crate::filter::ast::{Expr, LogicOp, CompOp, Var};
 use crate::filter::util::apply_string_escapes;
 use crate::{FieldType, FieldValue, FieldDefinition};
 
 grammar(field_defs: &HashMap<String, FieldDefinition>);
 
-Var: String = <s:r"[a-zA-Z0-9]+(_[a-zA-Z0-9]+)*(\.[a-zA-Z0-9]+(_[a-zA-Z0-9]+)*)*"> => s.into();
+Var: Var = {
+    VarName "." Var => Var::Node(VarName, Box::new(Var)),
+    VarName => Var::Leaf(VarName)
+};
+
+VarName: String = <s:r"[a-zA-Z0-9]+(_[a-zA-Z0-9]+)*([a-zA-Z0-9]+(_[a-zA-Z0-9]+)*)*"> => s.into();
+
+// Var: String = <s:r"[a-zA-Z0-9]+(_[a-zA-Z0-9]+)*(\.[a-zA-Z0-9]+(_[a-zA-Z0-9]+)*)*"> => s.into();
 
 Val: Option<String> = {
 	<s:r#""(\\\\|\\"|[^"\\])*""#> => apply_string_escapes(&s[1..s.len()-1]).into(),

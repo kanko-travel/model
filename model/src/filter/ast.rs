@@ -5,7 +5,7 @@ use super::parser::ExprParser;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Expr {
-    Var(String),
+    Var(Var),
     Val(FieldValue),
     Comp(Box<Expr>, CompOp, Box<Expr>),
     Neg(LogicOp, Box<Expr>),
@@ -14,10 +14,43 @@ pub enum Expr {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+pub enum Var {
+    Leaf(String),
+    Node(VarNode),
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct VarNode {
+    name: String,
+    var: Box<Var>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub enum LogicOp {
     Not,
     And,
     Or,
+}
+
+impl Var {
+    fn to_sql(&self) -> String {
+        self.to_string()
+    }
+}
+
+impl ToString for Var {
+    fn to_string(&self) -> String {
+        match self {
+            Self::Leaf(val) => val.into(),
+            Self::Node(node) => format!("{}.{}", node.name, node.var.to_sql()),
+        }
+    }
+}
+
+impl From<&str> for Var {
+    fn from(value: &str) -> Self {
+        Self::Leaf(value.into())
+    }
 }
 
 impl LogicOp {
@@ -99,7 +132,7 @@ impl Expr {
 
     pub fn to_sql(&self, var_binding_idx_offset: usize) -> (String, Vec<FieldValue>) {
         match self {
-            Expr::Var(var) => (var.clone(), vec![]),
+            Expr::Var(var) => (var.to_sql(), vec![]),
             Expr::Val(val) => {
                 let sql = format!("${}", var_binding_idx_offset + 1);
                 (sql, vec![val.clone()])
@@ -155,14 +188,14 @@ impl TryInto<Filter> for Expr {
                 match *var {
                     Expr::Var(var) => match *val {
                         Expr::Val(val) => match op {
-                            CompOp::Eq => Filter::new().field(&var).eq(val),
-                            CompOp::Neq => Filter::new().field(&var).neq(val),
-                            CompOp::Gt => Filter::new().field(&var).gt(val),
-                            CompOp::Gte => Filter::new().field(&var).gte(val),
-                            CompOp::Lt => Filter::new().field(&var).lt(val),
-                            CompOp::Lte => Filter::new().field(&var).lte(val),
-                            CompOp::Like => Filter::new().field(&var).like(val),
-                            CompOp::Ilike => Filter::new().field(&var).ilike(val),
+                            CompOp::Eq => Filter::new().field(&var.to_string()).eq(val),
+                            CompOp::Neq => Filter::new().field(&var.to_string()).neq(val),
+                            CompOp::Gt => Filter::new().field(&var.to_string()).gt(val),
+                            CompOp::Gte => Filter::new().field(&var.to_string()).gte(val),
+                            CompOp::Lt => Filter::new().field(&var.to_string()).lt(val),
+                            CompOp::Lte => Filter::new().field(&var.to_string()).lte(val),
+                            CompOp::Like => Filter::new().field(&var.to_string()).like(val),
+                            CompOp::Ilike => Filter::new().field(&var.to_string()).ilike(val),
                         },
                         _ => return Err(Error::internal("invalid filter expression: this should not happen as any errors should have been caught during parsing of the expression")) 
                     },
