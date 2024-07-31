@@ -1,34 +1,98 @@
-use crate::{FieldDefinition, Model};
+use crate::{Model, ModelDef};
 
-pub trait Relation<T: Model> {
-    fn identity() -> RelationIdent;
+pub trait Related {
+    fn relation_definitions() -> Vec<RelationDef>;
+}
 
-    fn def() -> RelationDef {
+pub struct RelationDef {
+    pub name: String,
+    pub reference: Reference,
+    pub model_definition: ModelDef,
+}
+
+pub enum Reference {
+    Direct(ReferenceDirect),
+    Via(ReferenceVia),
+}
+
+pub struct ReferenceDirect {
+    from: (String, String),
+    to: (String, String),
+}
+
+pub struct ReferenceVia {
+    from: (String, String),
+    via: (String, String, String),
+    to: (String, String),
+}
+
+impl RelationDef {
+    pub fn belongs_to<T, U>(name: String, column: String) -> Self
+    where
+        T: Model,
+        U: Model,
+    {
         RelationDef {
-            identity: Self::identity(),
-            related_model: RelatedModel {
-                table_name: T::table_name,
-                id_field_name: T::id_field_name,
-                field_definitions: T::field_definitions,
-            },
+            name,
+            reference: Reference::Direct(ReferenceDirect {
+                from: (T::table_name(), column),
+                to: (U::table_name(), U::id_field_name()),
+            }),
+            model_definition: U::definition(),
+        }
+    }
+
+    pub fn has_one<T, U>(name: String, column: String) -> Self
+    where
+        T: Model,
+        U: Model,
+    {
+        RelationDef {
+            name,
+            reference: Reference::Direct(ReferenceDirect {
+                from: (T::table_name(), T::id_field_name()),
+                to: (U::table_name(), column),
+            }),
+            model_definition: U::definition(),
+        }
+    }
+
+    pub fn has_many<T, U>(name: String, column: String) -> Self
+    where
+        T: Model,
+        U: Model,
+    {
+        RelationDef {
+            name,
+            reference: Reference::Direct(ReferenceDirect {
+                from: (T::table_name(), T::id_field_name()),
+                to: (U::table_name(), column),
+            }),
+            model_definition: U::definition(),
+        }
+    }
+
+    pub fn has_many_via_junction_table<T, U>(name: String, junction_table_name: String) -> Self
+    where
+        T: Model,
+        U: Model,
+    {
+        RelationDef {
+            name,
+            reference: Reference::Via(ReferenceVia {
+                from: (T::table_name(), T::id_field_name()),
+                to: (U::table_name(), U::id_field_name()),
+                via: (
+                    junction_table_name,
+                    junction_table_column(&T::table_name(), &T::id_field_name()),
+                    junction_table_column(&U::table_name(), &U::id_field_name()),
+                ),
+            }),
+            model_definition: U::definition(),
         }
     }
 }
 
-pub struct RelationDef {
-    pub identity: RelationIdent,
-    pub related_model: RelatedModel,
-}
-
-pub enum RelationIdent {
-    BelongsTo { name: String, from: String },
-    HasOne { name: String, to: String },
-    HasMany { name: String, to: String },
-    HasManyVia { name: String, via: String, from: String, to: String }
-}
-
-pub struct RelatedModel {
-    pub table_name: fn() -> String,
-    pub id_field_name: fn() -> String,
-    pub field_definitions: fn() -> Vec<FieldDefinition>,
+fn junction_table_column(table: &str, column: &str) -> String {
+    format!("{}_{}", table, column)
 }

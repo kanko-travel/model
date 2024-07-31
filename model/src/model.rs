@@ -9,13 +9,46 @@ pub trait Model {
     fn table_name() -> String;
     fn id_field_name() -> String;
     fn field_definitions() -> Vec<FieldDefinition>;
-    /// Currently this method must be manually derived. Relations defined via
-    /// implementation of the Relation trait will still allow calling
-    /// relation methods in code. However, in order to allow queries involving
-    /// relations using the filter dsl, this method must return the referenced relations
-    fn relation_definitions() -> Vec<RelationDef> {
-        vec![]
+    fn definition() -> ModelDef {
+        ModelDef {
+            table_name: Self::table_name,
+            id_field_name: Self::id_field_name,
+            field_definitions: Self::field_definitions,
+        }
     }
+
+    fn belongs_to<R>(name: String, column: String) -> RelationDef
+    where
+        Self: Sized,
+        R: Model,
+    {
+        RelationDef::belongs_to::<Self, R>(name, column)
+    }
+
+    fn has_one<R>(name: String, column: String) -> RelationDef
+    where
+        Self: Sized,
+        R: Model,
+    {
+        RelationDef::has_one::<Self, R>(name, column)
+    }
+
+    fn has_many<R>(name: String, column: String) -> RelationDef
+    where
+        Self: Sized,
+        R: Model,
+    {
+        RelationDef::has_many::<Self, R>(name, column)
+    }
+
+    fn has_many_via_junction_table<R>(name: String, junction_table_name: String) -> RelationDef
+    where
+        Self: Sized,
+        R: Model,
+    {
+        RelationDef::has_many_via_junction_table::<Self, R>(name, junction_table_name)
+    }
+
     fn id_field_value(&self) -> Uuid;
     fn field_value(&self, field: &str) -> Result<FieldValue, Error>;
     fn fields(&self) -> Result<Vec<(FieldDefinition, FieldValue)>, Error> {
@@ -29,6 +62,12 @@ pub trait Model {
 
         Ok(fields)
     }
+}
+
+pub struct ModelDef {
+    pub table_name: fn() -> String,
+    pub id_field_name: fn() -> String,
+    pub field_definitions: fn() -> Vec<FieldDefinition>,
 }
 
 pub trait Enum: Sized {
