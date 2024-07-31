@@ -64,6 +64,7 @@ pub trait Model {
     }
 }
 
+#[derive(Debug)]
 pub struct ModelDef {
     pub table_name: fn() -> String,
     pub id_field_name: fn() -> String,

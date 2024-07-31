@@ -4,26 +4,30 @@ pub trait Related {
     fn relation_definitions() -> Vec<RelationDef>;
 }
 
+#[derive(Debug)]
 pub struct RelationDef {
     pub name: String,
     pub reference: Reference,
     pub model_definition: ModelDef,
 }
 
+#[derive(Debug)]
 pub enum Reference {
     Direct(ReferenceDirect),
     Via(ReferenceVia),
 }
 
+#[derive(Debug)]
 pub struct ReferenceDirect {
-    from: (String, String),
-    to: (String, String),
+    pub from: (String, String),
+    pub to: (String, String),
 }
 
+#[derive(Debug)]
 pub struct ReferenceVia {
-    from: (String, String),
-    via: (String, String, String),
-    to: (String, String),
+    pub from: (String, String),
+    pub via: (String, String, String),
+    pub to: (String, String),
 }
 
 impl RelationDef {
@@ -95,4 +99,80 @@ impl RelationDef {
 
 fn junction_table_column(table: &str, column: &str) -> String {
     format!("{}_{}", table, column)
+}
+
+#[cfg(test)]
+mod test {
+    use crate as model;
+
+    use crate::Model;
+    use uuid::Uuid;
+
+    use super::*;
+
+    #[test]
+    fn test_relations() {
+        #[derive(Clone, Debug, Model)]
+        #[model(table_name = "students")]
+        struct Student {
+            #[model(primary_key, id)]
+            id: Uuid,
+            name: String,
+            dorm_id: Uuid,
+        }
+
+        #[derive(Clone, Debug, Model)]
+        #[model(table_name = "courses")]
+        struct Course {
+            #[model(primary_key, id)]
+            id: Uuid,
+            name: String,
+        }
+
+        #[derive(Clone, Debug, Model)]
+        #[model(table_name = "dorms")]
+        struct Dorm {
+            #[model(primary_key, id)]
+            id: Uuid,
+            name: String,
+        }
+
+        impl Related for Student {
+            fn relation_definitions() -> Vec<RelationDef> {
+                vec![
+                    Self::has_many_via_junction_table::<Course>(
+                        "registered_courses".into(),
+                        "student_registered_courses".into(),
+                    ),
+                    Self::belongs_to::<Dorm>("dorm".into(), "dorm_id".into()),
+                ]
+            }
+        }
+
+        impl Related for Course {
+            fn relation_definitions() -> Vec<RelationDef> {
+                vec![Self::has_many_via_junction_table::<Student>(
+                    "students".into(),
+                    "student_registered_courses".into(),
+                )]
+            }
+        }
+
+        impl Related for Dorm {
+            fn relation_definitions() -> Vec<RelationDef> {
+                vec![Self::has_many::<Student>(
+                    "students".into(),
+                    "dorm_id".into(),
+                )]
+            }
+        }
+
+        let student_relations = Student::relation_definitions();
+        let course_relations = Course::relation_definitions();
+        let dorm_relations = Dorm::relation_definitions();
+
+        println!("{:?}", student_relations);
+        println!("{:?}", course_relations);
+        println!("{:?}", dorm_relations);
+    }
 }

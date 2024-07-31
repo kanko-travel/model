@@ -24,4 +24,5 @@ pub use model_derive::Model;
 pub use model_wrapper::model_wrapper;
 pub use pgoutput::FromPgoutput;
 pub use query::*;
+pub use relation::Related;
 pub use sqlx;
