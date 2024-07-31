@@ -1,7 +1,9 @@
 use crate::{Model, ModelDef};
 
 pub trait Related {
-    fn relation_definitions() -> Vec<RelationDef>;
+    fn relation_definitions() -> Vec<RelationDef> {
+        vec![]
+    }
 }
 
 #[derive(Debug)]
@@ -113,7 +115,7 @@ mod test {
     #[test]
     fn test_relations() {
         #[derive(Clone, Debug, Model)]
-        #[model(table_name = "students")]
+        #[model(table_name = "students", has_relations)]
         struct Student {
             #[model(primary_key, id)]
             id: Uuid,
@@ -122,7 +124,7 @@ mod test {
         }
 
         #[derive(Clone, Debug, Model)]
-        #[model(table_name = "courses")]
+        #[model(table_name = "courses", has_relations)]
         struct Course {
             #[model(primary_key, id)]
             id: Uuid,
@@ -130,7 +132,7 @@ mod test {
         }
 
         #[derive(Clone, Debug, Model)]
-        #[model(table_name = "dorms")]
+        #[model(table_name = "dorms", has_relations)]
         struct Dorm {
             #[model(primary_key, id)]
             id: Uuid,

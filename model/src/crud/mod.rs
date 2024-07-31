@@ -52,7 +52,6 @@ impl<T> Crud for T where
 
 mod create;
 mod delete;
-mod join;
 mod select;
 mod update;
 mod util;

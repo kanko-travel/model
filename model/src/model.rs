@@ -4,8 +4,9 @@ use uuid::Uuid;
 use crate::relation::RelationDef;
 use crate::Error;
 use crate::FieldValue;
+use crate::Related;
 
-pub trait Model {
+pub trait Model: Related {
     fn table_name() -> String;
     fn id_field_name() -> String;
     fn field_definitions() -> Vec<FieldDefinition>;
@@ -14,6 +15,7 @@ pub trait Model {
             table_name: Self::table_name,
             id_field_name: Self::id_field_name,
             field_definitions: Self::field_definitions,
+            relation_definitions: Self::relation_definitions,
         }
     }
 
@@ -69,6 +71,7 @@ pub struct ModelDef {
     pub table_name: fn() -> String,
     pub id_field_name: fn() -> String,
     pub field_definitions: fn() -> Vec<FieldDefinition>,
+    pub relation_definitions: fn() -> Vec<RelationDef>,
 }
 
 pub trait Enum: Sized {

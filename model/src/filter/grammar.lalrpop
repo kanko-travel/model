@@ -1,14 +1,13 @@
 use std::str::FromStr;
-use std::collections::HashMap;
 use uuid::Uuid;
 use rust_decimal::Decimal;
 use chrono::{DateTime, NaiveDate};
 use lalrpop_util::ParseError;
 use crate::filter::ast::{Expr, LogicOp, CompOp, Var};
 use crate::filter::util::apply_string_escapes;
-use crate::{FieldType, FieldValue, FieldDefinition};
+use crate::{FieldType, FieldValue, ModelDef};
 
-grammar(field_defs: &HashMap<String, FieldDefinition>);
+grammar(model_def: &ModelDef);
 
 Var: Var = {
     <name: VarName> "." <var: Var> => Var::Node((name, Box::new(var))),
@@ -28,10 +27,8 @@ Val: Option<String> = {
 
 Comp: Box<Expr> = {
 	<var:Var> <op:CompOp> <val:Val> =>? {
-		let def = field_defs.get(&var.to_string()).ok_or_else(|| {
-			ParseError::User {
-				error: "invalid variable name"
-			}
+		let def = var.resolve_definition(model_def).map_err(|_| ParseError::User {
+			error: "undefined field"
 		})?;
 
 		let val: FieldValue = if let Some(val) = val {

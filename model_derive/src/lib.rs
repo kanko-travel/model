@@ -17,21 +17,29 @@ pub fn model_derive(input: TokenStream) -> TokenStream {
     // Initialize the table name to a default or error message in case attribute is not found
     let mut table_name = None;
 
+    let mut related_derive = quote! {
+        impl #impl_generics model::Related for #ident #type_generics #where_clause {}
+    };
+
     // Iterate over the attributes to find `model` and then `table_name`
     for attr in input.attrs {
         if let Ok(Meta::List(meta)) = attr.parse_meta() {
             if meta.path.is_ident("model") {
                 for nested_meta in meta.nested {
-                    if let NestedMeta::Meta(Meta::NameValue(MetaNameValue {
-                        path,
-                        lit: Lit::Str(lit_str),
-                        ..
-                    })) = nested_meta
-                    {
-                        if path.is_ident("table_name") {
-                            table_name = lit_str.into();
-                            break;
+                    match nested_meta {
+                        NestedMeta::Meta(Meta::Path(path)) if path.is_ident("has_relations") => {
+                            related_derive = quote! {};
                         }
+                        NestedMeta::Meta(Meta::NameValue(MetaNameValue {
+                            path,
+                            lit: Lit::Str(lit_str),
+                            ..
+                        })) => {
+                            if path.is_ident("table_name") {
+                                table_name = lit_str.into();
+                            }
+                        }
+                        _ => panic!("Invalid attribute"),
                     }
                 }
             }
@@ -43,9 +51,9 @@ pub fn model_derive(input: TokenStream) -> TokenStream {
     let fields = match input.data {
         Data::Struct(data) => match data.fields {
             Fields::Named(fields) => fields.named,
-            _ => unimplemented!("Queryable only supports named fields"),
+            _ => panic!("Queryable only supports named fields"),
         },
-        _ => unimplemented!("Queryable can only be derived for structs"),
+        _ => panic!("Queryable can only be derived for structs"),
     };
 
     // find the id field
@@ -173,6 +181,8 @@ pub fn model_derive(input: TokenStream) -> TokenStream {
                 }
             }
         }
+
+        #related_derive
     };
 
     gen.into()
