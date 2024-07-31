@@ -66,6 +66,14 @@ mod test {
                 unique: false,
                 nullable: false,
             },
+            FieldDefinition {
+                name: "some_nested.int_field".into(),
+                type_: FieldType::Int,
+                immutable: false,
+                primary_key: false,
+                unique: false,
+                nullable: false,
+            },
         ]
         .into();
 
@@ -230,6 +238,14 @@ mod test {
     fn test_boolean_values() {
         let field_defs = field_definitions();
         let query = r#"(org_id = null || start_date > null) && !(property_id = null || max_occupancy >= null) && closed = true"#;
+
+        ExprParser::new().parse(&field_defs, query).unwrap();
+    }
+
+    #[test]
+    fn test_nested_field() {
+        let field_defs = field_definitions();
+        let query = r#"some_nested.int_field > "3""#;
 
         ExprParser::new().parse(&field_defs, query).unwrap();
     }

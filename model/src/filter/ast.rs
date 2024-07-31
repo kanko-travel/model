@@ -16,13 +16,7 @@ pub enum Expr {
 #[derive(Clone, Debug, PartialEq)]
 pub enum Var {
     Leaf(String),
-    Node(VarNode),
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct VarNode {
-    name: String,
-    var: Box<Var>,
+    Node((String, Box<Var>)),
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -42,7 +36,7 @@ impl ToString for Var {
     fn to_string(&self) -> String {
         match self {
             Self::Leaf(val) => val.into(),
-            Self::Node(node) => format!("{}.{}", node.name, node.var.to_sql()),
+            Self::Node((name, var)) => format!("{}.{}", name, var.to_sql()),
         }
     }
 }
