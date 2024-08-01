@@ -1,12 +1,14 @@
+use std::collections::HashSet;
 use std::marker::PhantomData;
 
 use sqlx::{postgres::PgRow, FromRow, PgConnection};
 
-use crate::Error;
+use crate::filter::ast::Var;
 use crate::{
     filter::ast::Expr, Connection, Cursor, FieldValue, Filter, Model, PageInfo, Query,
     SortDirection,
 };
+use crate::{Error, ModelDef};
 
 use super::util::build_query_as;
 
@@ -40,25 +42,17 @@ impl OrderBy {
         }
     }
 
-    fn to_string(&self, id_field_name: &str, for_join: bool) -> String {
+    fn to_string(&self, id_field_name: &str) -> String {
         match &self {
             OrderBy::IdAsc => format!("{} ASC", id_field_name),
             OrderBy::IdDesc => format!("{} DESC", id_field_name),
             OrderBy::SecondaryAsc(field_name) => {
-                let field_name = if for_join {
-                    format!("a.{}", field_name)
-                } else {
-                    field_name.into()
-                };
+                let field_name = field_name.to_string();
 
                 format!("{} ASC, {} ASC", field_name, id_field_name)
             }
             OrderBy::SecondaryDesc(field_name) => {
-                let field_name = if for_join {
-                    format!("a.{}", field_name)
-                } else {
-                    field_name.into()
-                };
+                let field_name = field_name.to_string();
 
                 format!("{} DESC, {} DESC", field_name, id_field_name)
             }
@@ -203,7 +197,7 @@ impl<T: Model> Select<T> {
         let table_name = T::table_name();
 
         let id_field_name = T::id_field_name();
-        let select_clause = format!("SELECT * FROM {}", table_name);
+        let select_clause = format!("SELECT DISTINCT {}.* FROM {}", table_name, table_name);
 
         let mut predicates = vec![];
         let mut vars = vec![];
@@ -236,6 +230,8 @@ impl<T: Model> Select<T> {
                 inverse_predicates.push(sql);
                 var_bindings.extend(b);
 
+                let join_clause = generate_join_clause::<T>(&vars)?;
+
                 let predicate = predicates.join(" AND ");
                 let where_clause = format!("WHERE {}", predicate);
 
@@ -248,11 +244,11 @@ impl<T: Model> Select<T> {
                     "".into()
                 };
 
-                let order_by = self.order_by.to_string(&id_field_name, false);
+                let order_by = self.order_by.to_string(&id_field_name);
 
                 let order_by_clause = format!("ORDER BY {}", order_by);
 
-                let inverse_order_by = self.order_by.inverse().to_string(&id_field_name, false);
+                let inverse_order_by = self.order_by.inverse().to_string(&id_field_name);
 
                 let inverse_order_by_clause = format!("ORDER BY {}", inverse_order_by);
 
@@ -283,8 +279,10 @@ impl<T: Model> Select<T> {
                             {}
                             {}
                             {}
+                            {}
                     ",
                     select_clause,
+                    join_clause,
                     inverse_where_clause,
                     group_by_clause,
                     inverse_order_by_clause,
@@ -312,6 +310,7 @@ impl<T: Model> Select<T> {
                 )
             }
             _ => {
+                let join_clause = generate_join_clause::<T>(&vars)?;
                 let predicate = predicates.join(" AND ");
                 let where_clause = format!("WHERE {}", predicate);
 
@@ -321,7 +320,7 @@ impl<T: Model> Select<T> {
                     "".into()
                 };
 
-                let order_by = self.order_by.to_string(&id_field_name, false);
+                let order_by = self.order_by.to_string(&id_field_name);
 
                 let order_by_clause = format!("ORDER BY {}", order_by);
 
@@ -339,8 +338,14 @@ impl<T: Model> Select<T> {
                         {}
                         {}
                         {}
+                        {}
                     ",
-                    select_clause, where_clause, group_by_clause, order_by_clause, limit_clause
+                    select_clause,
+                    join_clause,
+                    where_clause,
+                    group_by_clause,
+                    order_by_clause,
+                    limit_clause
                 )
             }
         };
@@ -490,4 +495,53 @@ fn split_nodes<T: Model>(
     }
 
     Ok((prev, next))
+}
+
+fn generate_join_clause<T: Model>(vars: &Vec<Var>) -> Result<String, Error> {
+    let mut seen = HashSet::new();
+    let mut join_clauses = vec![];
+
+    for var in vars.iter() {
+        let joins = joins_from_var(&T::table_name(), var, &T::definition())?;
+
+        for (relation, join_clause) in joins.iter() {
+            if seen.insert(relation.clone()) {
+                join_clauses.push(join_clause.clone());
+            }
+        }
+    }
+
+    Ok(join_clauses.join("\n"))
+}
+
+fn joins_from_var(
+    parent: &str,
+    var: &Var,
+    model_def: &ModelDef,
+) -> Result<Vec<(String, String)>, Error> {
+    match var {
+        Var::Leaf(_) => Ok(vec![]),
+        Var::Node((name, var)) => {
+            let relation_defs = (model_def.relation_definitions)();
+            let relation_def = relation_defs
+                .iter()
+                .find(|def| &def.name == name)
+                .ok_or_else(|| Error::bad_request("undefined field"))?;
+
+            let id_field_name = (model_def.id_field_name)();
+            let join_clause = relation_def.to_join_clause(&parent, &id_field_name);
+
+            let next_parent = format!("{}_{}", parent, name);
+
+            let mut res = vec![(next_parent.clone(), join_clause)];
+
+            res.extend(joins_from_var(
+                &next_parent,
+                var.as_ref(),
+                &relation_def.model_definition,
+            )?);
+
+            Ok(res)
+        }
+    }
 }

@@ -43,12 +43,12 @@ pub trait Model: Related {
         RelationDef::has_many::<Self, R>(name, column)
     }
 
-    fn has_many_via_junction_table<R>(name: String, junction_table_name: String) -> RelationDef
+    fn has_many_via<R>(name: String, junction_table_name: String) -> RelationDef
     where
         Self: Sized,
         R: Model,
     {
-        RelationDef::has_many_via_junction_table::<Self, R>(name, junction_table_name)
+        RelationDef::has_many_via::<Self, R>(name, junction_table_name)
     }
 
     fn id_field_value(&self) -> Uuid;

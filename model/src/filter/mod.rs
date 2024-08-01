@@ -11,10 +11,7 @@ mod test {
         ast::{CompOp, Expr, LogicOp},
         parser::ExprParser,
     };
-    use crate::{
-        relation::{ReferenceDirect, RelationDef},
-        FieldDefinition, FieldType, FieldValue, ModelDef,
-    };
+    use crate::{relation::RelationDef, FieldDefinition, FieldType, FieldValue, ModelDef};
     use chrono::NaiveDate;
 
     fn definition() -> ModelDef {
@@ -98,10 +95,7 @@ mod test {
     fn relation_definitions() -> Vec<RelationDef> {
         vec![RelationDef {
             name: "parent".into(),
-            reference: crate::relation::Reference::Direct(ReferenceDirect {
-                from: (table_name(), "parent_id".into()),
-                to: (table_name(), id_field_name()),
-            }),
+            reference: crate::relation::Reference::From("parent_id".into()),
             model_definition: definition(),
         }]
     }
