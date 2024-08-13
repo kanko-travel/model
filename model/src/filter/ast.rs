@@ -1,4 +1,4 @@
-use crate::{Error, FieldDefinition, ModelDef};
+use crate::{sort_by, Error, FieldDefinition, ModelDef};
 use crate::{FieldDefinitionMap, FieldValue, Filter, Model};
 
 use super::parser::ExprParser;
@@ -53,6 +53,24 @@ impl Var {
                 var.resolve_definition(model_def)
             }
         }
+    }
+
+    pub fn from_sort_by_str<T: Model>(input: &str) -> Result<Self, Error> {
+        let model_def = T::definition();
+
+        let var = sort_by::parser::ExprParser::new()
+            .parse(&model_def, input)
+            .map_err(|err| Error::bad_request(&format!("invalid sort_by: {:?}", err)))?;
+
+        // let expr = *boxed;
+
+        // if let Expr::Var(var) = expr {
+        //     return Ok(var)
+        // };
+
+        // Err(Error::bad_request("invalid "))
+
+        Ok(var)
     }
 }
 

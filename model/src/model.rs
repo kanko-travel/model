@@ -1,4 +1,9 @@
+use chrono::DateTime;
+use chrono::NaiveDate;
+use rust_decimal::Decimal;
+use serde_json::Value;
 use std::collections::HashMap;
+use std::str::FromStr;
 use uuid::Uuid;
 
 use crate::relation::RelationDef;
@@ -137,6 +142,49 @@ impl FieldType {
             Self::Json => "jsonb",
             Self::Enum(_) => "text",
         }
+    }
+
+    pub fn parse_value(&self, value: &str) -> Result<FieldValue, Error> {
+        let field_value = match self {
+            FieldType::Uuid => Uuid::parse_str(value)
+                .map_err(|_| Error::bad_request("invalid uuid"))?
+                .into(),
+            FieldType::Bool => bool::from_str(value)
+                .map_err(|_| Error::bad_request("invalid bool"))?
+                .into(),
+            FieldType::Int => i64::from_str(value)
+                .map_err(|_| Error::bad_request("invalid int"))?
+                .into(),
+            FieldType::Int32 => i32::from_str(value)
+                .map_err(|_| Error::bad_request("invalid i32"))?
+                .into(),
+            FieldType::Float => f64::from_str(value)
+                .map_err(|_| Error::bad_request("invalid f64"))?
+                .into(),
+            FieldType::Decimal => Decimal::from_str(value)
+                .map_err(|_| Error::bad_request("invalid decimal"))?
+                .into(),
+            FieldType::String => value.to_string().into(),
+            FieldType::Date => NaiveDate::parse_from_str(value, "%Y-%m-%d")
+                .map_err(|_| Error::bad_request("invalid date"))?
+                .into(),
+            FieldType::DateTime => DateTime::parse_from_rfc3339(value)
+                .map_err(|_| Error::bad_request("invalid datetime"))?
+                .into(),
+            FieldType::Enum(variants) => {
+                variants
+                    .iter()
+                    .find(|&v| v == value)
+                    .ok_or_else(|| Error::bad_request("invalid enum variant"))?;
+
+                FieldValue::Enum(value.to_string().into())
+            }
+            FieldType::Json => Value::from_str(value)
+                .map_err(|_| Error::bad_request("invalid json"))?
+                .into(),
+        };
+
+        Ok(field_value)
     }
 }
 

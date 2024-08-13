@@ -14,8 +14,16 @@ use super::util::build_query_as;
 
 const DEFAULT_LIMIT: i64 = 100;
 
+#[derive(FromRow)]
+pub struct WithCursor<T> {
+    #[sqlx(flatten)]
+    node: T,
+    _cursor: String,
+}
+
 #[derive(Clone, Debug)]
 pub struct Select<T: Model> {
+    select_path: String,
     filters: Vec<Filter>,
     order_by: OrderBy,
     cursor: Option<Cursor>,
@@ -28,8 +36,8 @@ pub struct Select<T: Model> {
 pub enum OrderBy {
     IdAsc,
     IdDesc,
-    SecondaryAsc(String),
-    SecondaryDesc(String),
+    SecondaryAsc(Var),
+    SecondaryDesc(Var),
 }
 
 impl OrderBy {
@@ -42,19 +50,20 @@ impl OrderBy {
         }
     }
 
+    fn field_name(&self, id_field_name: &str) -> String {
+        match &self {
+            OrderBy::IdAsc | OrderBy::IdDesc => id_field_name.into(),
+            OrderBy::SecondaryAsc(var) | OrderBy::SecondaryDesc(var) => var.to_string(),
+        }
+    }
+
     fn to_string(&self, id_field_name: &str) -> String {
         match &self {
-            OrderBy::IdAsc => format!("{} ASC", id_field_name),
-            OrderBy::IdDesc => format!("{} DESC", id_field_name),
-            OrderBy::SecondaryAsc(field_name) => {
-                let field_name = field_name.to_string();
-
-                format!("{} ASC, {} ASC", field_name, id_field_name)
+            OrderBy::IdAsc | OrderBy::SecondaryAsc(_) => {
+                format!("{} ASC", self.field_name(id_field_name))
             }
-            OrderBy::SecondaryDesc(field_name) => {
-                let field_name = field_name.to_string();
-
-                format!("{} DESC, {} DESC", field_name, id_field_name)
+            OrderBy::IdDesc | OrderBy::SecondaryDesc(_) => {
+                format!("{} DESC", self.field_name(id_field_name))
             }
         }
     }
@@ -106,7 +115,7 @@ where
         let filters = self.build_filters()?;
         let (statement, var_bindings) = self.prepare(filters)?;
 
-        let nodes = build_query_as::<T>(&statement, var_bindings)
+        let nodes = build_query_as::<WithCursor<T>>(&statement, var_bindings)
             .fetch_all(executor)
             .await?;
 
@@ -139,6 +148,7 @@ where
 impl<T: Model> Select<T> {
     pub(crate) fn new() -> Self {
         Self {
+            select_path: T::table_name(),
             filters: vec![],
             order_by: OrderBy::IdAsc,
             cursor: None,
@@ -148,7 +158,7 @@ impl<T: Model> Select<T> {
         }
     }
 
-    pub(crate) fn paginate(&self, nodes: Vec<T>) -> Result<Connection<T>, Error> {
+    pub(crate) fn paginate(&self, nodes: Vec<WithCursor<T>>) -> Result<Connection<T>, Error> {
         let mut prev_cursor = None;
 
         let mut page_nodes = if let Some(cursor) = &self.cursor {
@@ -174,7 +184,7 @@ impl<T: Model> Select<T> {
                 let next_cursor = build_cursor(&cursor_node, &self.order_by)?;
 
                 Ok(Connection {
-                    nodes: page_nodes,
+                    nodes: page_nodes.into_iter().map(|n| n.node).collect(),
                     page_info: PageInfo {
                         prev_cursor,
                         next_cursor: next_cursor.into(),
@@ -182,7 +192,7 @@ impl<T: Model> Select<T> {
                 })
             }
             _ => Ok(Connection {
-                nodes: page_nodes,
+                nodes: page_nodes.into_iter().map(|n| n.node).collect(),
                 page_info: PageInfo {
                     prev_cursor,
                     next_cursor: None,
@@ -197,10 +207,23 @@ impl<T: Model> Select<T> {
         let table_name = T::table_name();
 
         let id_field_name = T::id_field_name();
-        let select_clause = format!("SELECT DISTINCT {}.* FROM {}", table_name, table_name);
+        let select_clause = format!(
+            "SELECT DISTINCT {}.*, {}::text AS _cursor FROM {}",
+            self.select_path,
+            self.order_by.field_name(&id_field_name),
+            table_name
+        );
+
+        let mut vars = vec![];
+
+        match &self.order_by {
+            OrderBy::SecondaryAsc(var) | OrderBy::SecondaryDesc(var) => {
+                vars.push(var.clone());
+            }
+            _ => {}
+        }
 
         let mut predicates = vec![];
-        let mut vars = vec![];
         let mut var_bindings = vec![];
 
         for expr in exprs.into_iter() {
@@ -238,7 +261,7 @@ impl<T: Model> Select<T> {
                 let inverse_predicate = inverse_predicates.join(" AND ");
                 let inverse_where_clause = format!("WHERE {}", inverse_predicate);
 
-                let group_by_clause = if false {
+                let group_by_clause = if join_clause != "" {
                     format!("GROUP BY {}", id_field_name)
                 } else {
                     "".into()
@@ -314,7 +337,7 @@ impl<T: Model> Select<T> {
                 let predicate = predicates.join(" AND ");
                 let where_clause = format!("WHERE {}", predicate);
 
-                let group_by_clause = if false {
+                let group_by_clause = if join_clause != "" {
                     format!("GROUP BY {}", id_field_name)
                 } else {
                     "".into()
@@ -383,7 +406,7 @@ impl<T: Model> TryFrom<Query<T>> for Select<T> {
         let id_field_name = T::id_field_name();
 
         let order_by = match query.sort {
-            Some(sort) if sort.field == id_field_name => match sort.direction {
+            Some(sort) if sort.field.to_string() == id_field_name => match sort.direction {
                 SortDirection::Ascending => OrderBy::IdAsc,
                 SortDirection::Descending => OrderBy::IdDesc,
             },
@@ -400,6 +423,7 @@ impl<T: Model> TryFrom<Query<T>> for Select<T> {
         }
 
         Ok(Select {
+            select_path: T::table_name(),
             filters,
             order_by,
             cursor: query.cursor,
@@ -457,16 +481,21 @@ fn build_cursor_filter<T: Model>(
     filter.build::<T>()
 }
 
-fn build_cursor<T: Model>(node: &T, order_by: &OrderBy) -> Result<Cursor, Error> {
+fn build_cursor<T: Model>(node: &WithCursor<T>, order_by: &OrderBy) -> Result<Cursor, Error> {
     let cursor = match order_by {
         OrderBy::IdAsc | OrderBy::IdDesc => Cursor {
-            id: node.id_field_value(),
+            id: node.node.id_field_value(),
             value: None,
         }
         .into(),
-        OrderBy::SecondaryAsc(field) | OrderBy::SecondaryDesc(field) => Cursor {
-            id: node.id_field_value(),
-            value: node.field_value(field)?.into(),
+        OrderBy::SecondaryAsc(var) | OrderBy::SecondaryDesc(var) => {
+            let model_def = T::definition();
+            let def = var.resolve_definition(&model_def)?;
+
+            Cursor {
+                id: node.node.id_field_value(),
+                value: def.type_.parse_value(&node._cursor)?.into(),
+            }
         }
         .into(),
     };
@@ -475,10 +504,10 @@ fn build_cursor<T: Model>(node: &T, order_by: &OrderBy) -> Result<Cursor, Error>
 }
 
 fn split_nodes<T: Model>(
-    nodes: Vec<T>,
+    nodes: Vec<WithCursor<T>>,
     cursor: &Cursor,
     order_by: &OrderBy,
-) -> Result<(Vec<T>, Vec<T>), Error> {
+) -> Result<(Vec<WithCursor<T>>, Vec<WithCursor<T>>), Error> {
     let mut prev = vec![];
     let mut next = vec![];
 

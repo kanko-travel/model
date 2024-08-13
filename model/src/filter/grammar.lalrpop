@@ -16,8 +16,6 @@ Var: Var = {
 
 VarName: String = <s:r"[a-zA-Z0-9]+(_[a-zA-Z0-9]+)*([a-zA-Z0-9]+(_[a-zA-Z0-9]+)*)*"> => s.into();
 
-// Var: String = <s:r"[a-zA-Z0-9]+(_[a-zA-Z0-9]+)*(\.[a-zA-Z0-9]+(_[a-zA-Z0-9]+)*)*"> => s.into();
-
 Val: Option<String> = {
 	<s:r#""(\\\\|\\"|[^"\\])*""#> => apply_string_escapes(&s[1..s.len()-1]).into(),
 	"null" => None,

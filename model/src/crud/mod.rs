@@ -2,7 +2,8 @@ use async_trait::async_trait;
 use sqlx::{Database, FromRow, Postgres};
 use uuid::Uuid;
 
-use crate::Error;
+use crate::relation::Reference;
+use crate::{Error, Filter};
 use crate::{Model, Query};
 
 use self::{create::Create, delete::Delete, select::Select, update::Update};
@@ -18,6 +19,32 @@ where
         + Sync
         + Send,
 {
+    fn select_related<'a, R>(&self, relation_name: &str) -> Result<Select<R>, Error>
+    where
+        R: Clone
+            + Model
+            + for<'b> FromRow<'b, <Postgres as Database>::Row>
+            + Unpin
+            + Sized
+            + Sync
+            + Send,
+    {
+        let relation = Self::relation_definitions()
+            .into_iter()
+            .find(|rel| rel.name == relation_name)
+            .ok_or_else(|| Error::internal("undefined relation"))?;
+
+        let filter = match relation.reference {
+            Reference::From(column) => Filter::new()
+                .field(&(relation.model_definition.id_field_name)())
+                .eq(self.field_value(&column)?),
+            Reference::To(column) => Filter::new().field(&column).eq(self.id_field_value()),
+            _ => unimplemented!(),
+        };
+
+        Ok(Select::new().with_filter(filter))
+    }
+
     fn create<'a>(&'a self) -> Create<'a, Self> {
         Create::new(self)
     }
