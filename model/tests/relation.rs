@@ -70,10 +70,12 @@ async fn test_relations() {
 
     let ddl = schema!(Dorm, Student, Course);
 
-    sqlx::query(&ddl)
-        .execute(&mut tx as &mut PgConnection)
-        .await
-        .unwrap();
+    for part in ddl.split("\n\n") {
+        sqlx::query(&part)
+            .execute(&mut tx as &mut PgConnection)
+            .await
+            .unwrap();
+    }
 
     tx.commit().await.unwrap();
 }

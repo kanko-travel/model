@@ -23,10 +23,12 @@ async fn create_db_pool() -> PgPool {
 async fn setup_tables(tx: &mut Transaction<'_, Postgres>) {
     let ddl = schema!(Dummy);
 
-    sqlx::query(&ddl)
-        .execute(tx as &mut PgConnection)
-        .await
-        .unwrap();
+    for part in ddl.split("\n\n") {
+        sqlx::query(part)
+            .execute(tx as &mut PgConnection)
+            .await
+            .unwrap();
+    }
 }
 
 async fn insert_records(tx: &mut Transaction<'_, Postgres>) {
