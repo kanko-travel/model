@@ -59,7 +59,7 @@ Comp: Box<Expr> = {
 				FieldType::Enum(variants) => {
 					match &op {
 						CompOp::Eq => {
-							variants.iter().find(|&&v| v == &val).ok_or_else(|| ParseError::User {
+							variants.iter().find(|&v| v == &val).ok_or_else(|| ParseError::User {
 								error: "invalid enum variant"
 							})?;
 						},
