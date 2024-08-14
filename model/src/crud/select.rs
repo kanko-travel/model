@@ -1,19 +1,29 @@
+use std::collections::HashSet;
 use std::marker::PhantomData;
 
 use sqlx::{postgres::PgRow, FromRow, PgConnection};
 
-use crate::Error;
+use crate::filter::ast::Var;
 use crate::{
     filter::ast::Expr, Connection, Cursor, FieldValue, Filter, Model, PageInfo, Query,
     SortDirection,
 };
+use crate::{Error, ModelDef};
 
-use super::{join::Join, util::build_query_as};
+use super::util::build_query_as;
 
 const DEFAULT_LIMIT: i64 = 100;
 
+#[derive(FromRow)]
+pub struct WithCursor<T> {
+    #[sqlx(flatten)]
+    node: T,
+    _cursor: String,
+}
+
 #[derive(Clone, Debug)]
 pub struct Select<T: Model> {
+    select_path: String,
     filters: Vec<Filter>,
     order_by: OrderBy,
     cursor: Option<Cursor>,
@@ -26,8 +36,8 @@ pub struct Select<T: Model> {
 pub enum OrderBy {
     IdAsc,
     IdDesc,
-    SecondaryAsc(String),
-    SecondaryDesc(String),
+    SecondaryAsc(Var),
+    SecondaryDesc(Var),
 }
 
 impl OrderBy {
@@ -40,27 +50,34 @@ impl OrderBy {
         }
     }
 
-    fn to_string(&self, id_field_name: &str, for_join: bool) -> String {
+    fn field_name(&self, id_field_name: &str) -> String {
         match &self {
-            OrderBy::IdAsc => format!("{} ASC", id_field_name),
-            OrderBy::IdDesc => format!("{} DESC", id_field_name),
-            OrderBy::SecondaryAsc(field_name) => {
-                let field_name = if for_join {
-                    format!("a.{}", field_name)
-                } else {
-                    field_name.into()
-                };
+            OrderBy::IdAsc | OrderBy::IdDesc => id_field_name.into(),
+            OrderBy::SecondaryAsc(var) | OrderBy::SecondaryDesc(var) => var.to_string(),
+        }
+    }
 
-                format!("{} ASC, {} ASC", field_name, id_field_name)
+    fn to_string(&self, id_field_name: &str) -> String {
+        match &self {
+            OrderBy::IdAsc => {
+                format!("{} ASC", id_field_name)
             }
-            OrderBy::SecondaryDesc(field_name) => {
-                let field_name = if for_join {
-                    format!("a.{}", field_name)
-                } else {
-                    field_name.into()
-                };
-
-                format!("{} DESC, {} DESC", field_name, id_field_name)
+            OrderBy::SecondaryAsc(_) => {
+                format!(
+                    "{} ASC, {} ASC",
+                    self.field_name(id_field_name),
+                    id_field_name
+                )
+            }
+            OrderBy::IdDesc => {
+                format!("{} DESC", id_field_name)
+            }
+            OrderBy::SecondaryDesc(_) => {
+                format!(
+                    "{} DESC, {} DESC",
+                    self.field_name(id_field_name),
+                    id_field_name
+                )
             }
         }
     }
@@ -102,14 +119,6 @@ impl<T: Model> Select<T> {
         self.for_update = true;
         self
     }
-
-    pub fn inner_join<F: Model>(self, filter: &str) -> Join<T, F> {
-        Join::new_inner(self, filter.into())
-    }
-
-    pub fn cross_join<F: Model>(self) -> Join<T, F> {
-        Join::new_cross(self)
-    }
 }
 
 impl<T> Select<T>
@@ -118,9 +127,9 @@ where
 {
     pub async fn fetch_page(&self, executor: &mut PgConnection) -> Result<Connection<T>, Error> {
         let filters = self.build_filters()?;
-        let (statement, var_bindings) = self.prepare(filters, None)?;
+        let (statement, var_bindings) = self.prepare(filters)?;
 
-        let nodes = build_query_as::<T>(&statement, var_bindings)
+        let nodes = build_query_as::<WithCursor<T>>(&statement, var_bindings)
             .fetch_all(executor)
             .await?;
 
@@ -129,7 +138,7 @@ where
 
     pub async fn fetch_one(&self, executor: &mut PgConnection) -> Result<T, Error> {
         let filters = self.build_filters()?;
-        let (statement, var_bindings) = self.prepare(filters, None)?;
+        let (statement, var_bindings) = self.prepare(filters)?;
 
         let result = build_query_as::<T>(&statement, var_bindings)
             .fetch_one(executor)
@@ -140,7 +149,7 @@ where
 
     pub async fn fetch_optional(&self, executor: &mut PgConnection) -> Result<Option<T>, Error> {
         let filters = self.build_filters()?;
-        let (statement, var_bindings) = self.prepare(filters, None)?;
+        let (statement, var_bindings) = self.prepare(filters)?;
 
         let result = build_query_as::<T>(&statement, var_bindings)
             .fetch_optional(executor)
@@ -153,6 +162,7 @@ where
 impl<T: Model> Select<T> {
     pub(crate) fn new() -> Self {
         Self {
+            select_path: T::table_name(),
             filters: vec![],
             order_by: OrderBy::IdAsc,
             cursor: None,
@@ -162,7 +172,7 @@ impl<T: Model> Select<T> {
         }
     }
 
-    pub(crate) fn paginate(&self, nodes: Vec<T>) -> Result<Connection<T>, Error> {
+    pub(crate) fn paginate(&self, nodes: Vec<WithCursor<T>>) -> Result<Connection<T>, Error> {
         let mut prev_cursor = None;
 
         let mut page_nodes = if let Some(cursor) = &self.cursor {
@@ -188,7 +198,7 @@ impl<T: Model> Select<T> {
                 let next_cursor = build_cursor(&cursor_node, &self.order_by)?;
 
                 Ok(Connection {
-                    nodes: page_nodes,
+                    nodes: page_nodes.into_iter().map(|n| n.node).collect(),
                     page_info: PageInfo {
                         prev_cursor,
                         next_cursor: next_cursor.into(),
@@ -196,7 +206,7 @@ impl<T: Model> Select<T> {
                 })
             }
             _ => Ok(Connection {
-                nodes: page_nodes,
+                nodes: page_nodes.into_iter().map(|n| n.node).collect(),
                 page_info: PageInfo {
                     prev_cursor,
                     next_cursor: None,
@@ -207,61 +217,57 @@ impl<T: Model> Select<T> {
 
     /// prepares a query statement that fetches a max size of limit * 2 + 1.
     /// includes limit + 1 rows after the provided cursor and limit rows before
-    pub(crate) fn prepare(
-        &self,
-        exprs: Vec<Expr>,
-        joined_select_clause: Option<String>,
-    ) -> Result<(String, Vec<FieldValue>), Error> {
+    pub(crate) fn prepare(&self, exprs: Vec<Expr>) -> Result<(String, Vec<FieldValue>), Error> {
         let table_name = T::table_name();
 
         let id_field_name = T::id_field_name();
-        let id_field_name = if joined_select_clause.is_some() {
-            format!("a.{}", id_field_name)
-        } else {
-            id_field_name
-        };
+        let select_clause = format!(
+            "SELECT DISTINCT {}.*, {}::text AS _cursor FROM {}",
+            self.select_path,
+            self.order_by.field_name(&id_field_name),
+            table_name
+        );
 
-        let select_clause = if let Some(s) = &joined_select_clause {
-            s.into()
-        } else {
-            format!("SELECT * FROM {}", table_name)
-        };
+        let mut vars = vec![];
+
+        match &self.order_by {
+            OrderBy::SecondaryAsc(var) | OrderBy::SecondaryDesc(var) => {
+                vars.push(var.clone());
+            }
+            _ => {}
+        }
 
         let mut predicates = vec![];
         let mut var_bindings = vec![];
 
         for expr in exprs.into_iter() {
-            let (sql, bindings) = expr.to_sql(var_bindings.len());
+            let (sql, v, b) = expr.to_sql(var_bindings.len());
 
             predicates.push(sql);
-            var_bindings.extend(bindings);
+            vars.extend(v);
+            var_bindings.extend(b);
         }
 
         let mut statement = match &self.cursor {
             Some(cursor) => {
                 let mut inverse_predicates = predicates.clone();
 
-                let cursor_filter = build_cursor_filter::<T>(
-                    cursor,
-                    &id_field_name,
-                    &self.order_by,
-                    joined_select_clause.is_some(),
-                )?;
+                let cursor_filter =
+                    build_cursor_filter::<T>(cursor, &id_field_name, &self.order_by)?;
 
-                let inverse_cursor_filter = build_cursor_filter::<T>(
-                    cursor,
-                    &id_field_name,
-                    &self.order_by.inverse(),
-                    joined_select_clause.is_some(),
-                )?;
+                let inverse_cursor_filter =
+                    build_cursor_filter::<T>(cursor, &id_field_name, &self.order_by.inverse())?;
 
-                let (sql, bindings) = cursor_filter.to_sql(var_bindings.len());
+                let (sql, v, b) = cursor_filter.to_sql(var_bindings.len());
                 predicates.push(sql);
-                var_bindings.extend(bindings);
+                vars.extend(v);
+                var_bindings.extend(b);
 
-                let (sql, bindings) = inverse_cursor_filter.to_sql(var_bindings.len());
+                let (sql, _, b) = inverse_cursor_filter.to_sql(var_bindings.len());
                 inverse_predicates.push(sql);
-                var_bindings.extend(bindings);
+                var_bindings.extend(b);
+
+                let join_clause = generate_join_clause::<T>(&vars)?;
 
                 let predicate = predicates.join(" AND ");
                 let where_clause = format!("WHERE {}", predicate);
@@ -269,22 +275,17 @@ impl<T: Model> Select<T> {
                 let inverse_predicate = inverse_predicates.join(" AND ");
                 let inverse_where_clause = format!("WHERE {}", inverse_predicate);
 
-                let group_by_clause = if joined_select_clause.is_some() {
+                let group_by_clause = if join_clause != "" {
                     format!("GROUP BY {}", id_field_name)
                 } else {
                     "".into()
                 };
 
-                let order_by = self
-                    .order_by
-                    .to_string(&id_field_name, joined_select_clause.is_some());
+                let order_by = self.order_by.to_string(&id_field_name);
 
                 let order_by_clause = format!("ORDER BY {}", order_by);
 
-                let inverse_order_by = self
-                    .order_by
-                    .inverse()
-                    .to_string(&id_field_name, joined_select_clause.is_some());
+                let inverse_order_by = self.order_by.inverse().to_string(&id_field_name);
 
                 let inverse_order_by_clause = format!("ORDER BY {}", inverse_order_by);
 
@@ -315,8 +316,10 @@ impl<T: Model> Select<T> {
                             {}
                             {}
                             {}
+                            {}
                     ",
                     select_clause,
+                    join_clause,
                     inverse_where_clause,
                     group_by_clause,
                     inverse_order_by_clause,
@@ -344,18 +347,17 @@ impl<T: Model> Select<T> {
                 )
             }
             _ => {
+                let join_clause = generate_join_clause::<T>(&vars)?;
                 let predicate = predicates.join(" AND ");
                 let where_clause = format!("WHERE {}", predicate);
 
-                let group_by_clause = if joined_select_clause.is_some() {
+                let group_by_clause = if join_clause != "" {
                     format!("GROUP BY {}", id_field_name)
                 } else {
                     "".into()
                 };
 
-                let order_by = self
-                    .order_by
-                    .to_string(&id_field_name, joined_select_clause.is_some());
+                let order_by = self.order_by.to_string(&id_field_name);
 
                 let order_by_clause = format!("ORDER BY {}", order_by);
 
@@ -373,8 +375,14 @@ impl<T: Model> Select<T> {
                         {}
                         {}
                         {}
+                        {}
                     ",
-                    select_clause, where_clause, group_by_clause, order_by_clause, limit_clause
+                    select_clause,
+                    join_clause,
+                    where_clause,
+                    group_by_clause,
+                    order_by_clause,
+                    limit_clause
                 )
             }
         };
@@ -404,16 +412,6 @@ impl<T: Model> Select<T> {
 
         Ok(results)
     }
-
-    pub(crate) fn build_filters_with_foreign<J: Model>(&self) -> Result<Vec<Expr>, Error> {
-        let mut results = vec![];
-
-        for filter in self.filters.clone().into_iter() {
-            results.push(filter.build_with_foreign::<T, J>()?);
-        }
-
-        Ok(results)
-    }
 }
 
 impl<T: Model> TryFrom<Query<T>> for Select<T> {
@@ -422,7 +420,7 @@ impl<T: Model> TryFrom<Query<T>> for Select<T> {
         let id_field_name = T::id_field_name();
 
         let order_by = match query.sort {
-            Some(sort) if sort.field == id_field_name => match sort.direction {
+            Some(sort) if sort.field.to_string() == id_field_name => match sort.direction {
                 SortDirection::Ascending => OrderBy::IdAsc,
                 SortDirection::Descending => OrderBy::IdDesc,
             },
@@ -439,6 +437,7 @@ impl<T: Model> TryFrom<Query<T>> for Select<T> {
         }
 
         Ok(Select {
+            select_path: T::table_name(),
             filters,
             order_by,
             cursor: query.cursor,
@@ -453,17 +452,12 @@ fn build_cursor_filter<T: Model>(
     cursor: &Cursor,
     id_field_name: &str,
     order_by: &OrderBy,
-    for_join: bool,
 ) -> Result<Expr, Error> {
     let filter = match order_by {
         OrderBy::IdAsc => Filter::new().field(id_field_name).gte(cursor.id),
         OrderBy::IdDesc => Filter::new().field(id_field_name).lte(cursor.id),
         OrderBy::SecondaryAsc(secondary) => {
-            let secondary = if for_join {
-                format!("a.{}", secondary)
-            } else {
-                secondary.into()
-            };
+            let secondary = secondary.to_string();
 
             let secondary_value = cursor.value.clone().ok_or_else(|| Error::bad_request("invalid cursor: a cursor containing a value referencing the sort_by field is required"))?;
             Filter::new()
@@ -480,11 +474,7 @@ fn build_cursor_filter<T: Model>(
                 )
         }
         OrderBy::SecondaryDesc(secondary) => {
-            let secondary = if for_join {
-                format!("a.{}", secondary)
-            } else {
-                secondary.into()
-            };
+            let secondary = secondary.to_string();
 
             let secondary_value = cursor.value.clone().ok_or_else(|| Error::bad_request("invalid cursor: a cursor containing a value referencing the sort_by field is required"))?;
             Filter::new()
@@ -505,16 +495,21 @@ fn build_cursor_filter<T: Model>(
     filter.build::<T>()
 }
 
-fn build_cursor<T: Model>(node: &T, order_by: &OrderBy) -> Result<Cursor, Error> {
+fn build_cursor<T: Model>(node: &WithCursor<T>, order_by: &OrderBy) -> Result<Cursor, Error> {
     let cursor = match order_by {
         OrderBy::IdAsc | OrderBy::IdDesc => Cursor {
-            id: node.id_field_value(),
+            id: node.node.id_field_value(),
             value: None,
         }
         .into(),
-        OrderBy::SecondaryAsc(field) | OrderBy::SecondaryDesc(field) => Cursor {
-            id: node.id_field_value(),
-            value: node.field_value(field)?.into(),
+        OrderBy::SecondaryAsc(var) | OrderBy::SecondaryDesc(var) => {
+            let model_def = T::definition();
+            let def = var.resolve_definition(&model_def)?;
+
+            Cursor {
+                id: node.node.id_field_value(),
+                value: def.type_.parse_value(&node._cursor)?.into(),
+            }
         }
         .into(),
     };
@@ -523,10 +518,10 @@ fn build_cursor<T: Model>(node: &T, order_by: &OrderBy) -> Result<Cursor, Error>
 }
 
 fn split_nodes<T: Model>(
-    nodes: Vec<T>,
+    nodes: Vec<WithCursor<T>>,
     cursor: &Cursor,
     order_by: &OrderBy,
-) -> Result<(Vec<T>, Vec<T>), Error> {
+) -> Result<(Vec<WithCursor<T>>, Vec<WithCursor<T>>), Error> {
     let mut prev = vec![];
     let mut next = vec![];
 
@@ -543,4 +538,53 @@ fn split_nodes<T: Model>(
     }
 
     Ok((prev, next))
+}
+
+fn generate_join_clause<T: Model>(vars: &Vec<Var>) -> Result<String, Error> {
+    let mut seen = HashSet::new();
+    let mut join_clauses = vec![];
+
+    for var in vars.iter() {
+        let joins = joins_from_var(&T::table_name(), var, &T::definition())?;
+
+        for (relation, join_clause) in joins.iter() {
+            if seen.insert(relation.clone()) {
+                join_clauses.push(join_clause.clone());
+            }
+        }
+    }
+
+    Ok(join_clauses.join("\n"))
+}
+
+fn joins_from_var(
+    parent: &str,
+    var: &Var,
+    model_def: &ModelDef,
+) -> Result<Vec<(String, String)>, Error> {
+    match var {
+        Var::Leaf(_) => Ok(vec![]),
+        Var::Node((name, var)) => {
+            let relation_defs = (model_def.relation_definitions)();
+            let relation_def = relation_defs
+                .iter()
+                .find(|def| &def.name == name)
+                .ok_or_else(|| Error::bad_request("undefined field"))?;
+
+            let id_field_name = (model_def.id_field_name)();
+            let join_clause = relation_def.to_join_clause(&parent, &id_field_name);
+
+            let next_parent = format!("{}_{}", parent, name);
+
+            let mut res = vec![(next_parent.clone(), join_clause)];
+
+            res.extend(joins_from_var(
+                &next_parent,
+                var.as_ref(),
+                &relation_def.model_definition,
+            )?);
+
+            Ok(res)
+        }
+    }
 }

@@ -7,17 +7,32 @@ lalrpop_mod!(pub(crate) parser, "/filter/grammar.rs");
 
 #[cfg(test)]
 mod test {
-    use std::collections::HashMap;
-
     use super::{
         ast::{CompOp, Expr, LogicOp},
         parser::ExprParser,
     };
-    use crate::{FieldDefinition, FieldDefinitionMap, FieldType, FieldValue};
+    use crate::{relation::RelationDef, FieldDefinition, FieldType, FieldValue, ModelDef};
     use chrono::NaiveDate;
 
-    fn field_definitions() -> HashMap<String, FieldDefinition> {
-        let FieldDefinitionMap(field_defs) = vec![
+    fn definition() -> ModelDef {
+        ModelDef {
+            table_name,
+            id_field_name,
+            field_definitions,
+            relation_definitions,
+        }
+    }
+
+    fn table_name() -> String {
+        "dummy_table".into()
+    }
+
+    fn id_field_name() -> String {
+        "id".into()
+    }
+
+    fn field_definitions() -> Vec<FieldDefinition> {
+        vec![
             FieldDefinition {
                 name: "org_id".into(),
                 type_: FieldType::Int,
@@ -66,15 +81,28 @@ mod test {
                 unique: false,
                 nullable: false,
             },
+            FieldDefinition {
+                name: "parent_id".into(),
+                type_: FieldType::Uuid,
+                immutable: false,
+                primary_key: false,
+                unique: false,
+                nullable: false,
+            },
         ]
-        .into();
+    }
 
-        field_defs
+    fn relation_definitions() -> Vec<RelationDef> {
+        vec![RelationDef {
+            name: "parent".into(),
+            reference: crate::relation::Reference::From("parent_id".into()),
+            model_definition: definition(),
+        }]
     }
 
     #[test]
     fn test_explicit_precedence() {
-        let field_defs = field_definitions();
+        let model_def = definition();
         let query = r#"(org_id = "123" || start_date > "2021-01-01") && (property_id = "444" || max_occupancy >= "4")"#;
 
         // lhs of OR
@@ -111,7 +139,7 @@ mod test {
         ));
 
         let expected = Box::new(Expr::Conj(first_disj, LogicOp::And, second_disj));
-        let generated = ExprParser::new().parse(&field_defs, query).unwrap();
+        let generated = ExprParser::new().parse(&model_def, query).unwrap();
 
         println!("Expected:");
         println!("{:?}\n", expected);
@@ -124,7 +152,7 @@ mod test {
 
     #[test]
     fn test_implicit_precedence() {
-        let field_defs = field_definitions();
+        let model_def = definition();
         let query = r#"org_id = "123" || start_date > "2021-01-01" && property_id = "444" || max_occupancy >= "4""#;
 
         // lhs of OR
@@ -161,7 +189,7 @@ mod test {
             LogicOp::Or,
             max_occupancy_comp,
         ));
-        let generated = ExprParser::new().parse(&field_defs, query).unwrap();
+        let generated = ExprParser::new().parse(&model_def, query).unwrap();
 
         println!("Expected:");
         println!("{:?}\n", expected);
@@ -174,7 +202,7 @@ mod test {
 
     #[test]
     fn test_negation() {
-        let field_defs = field_definitions();
+        let model_def = definition();
         let query = r#"!org_id="678""#;
 
         let org_id_var = Expr::Var("org_id".into());
@@ -183,7 +211,7 @@ mod test {
         let cond = Expr::Comp(org_id_var.into(), CompOp::Eq, org_id_val.into());
 
         let expected = Box::new(Expr::Neg(LogicOp::Not, cond.into()));
-        let generated = ExprParser::new().parse(&field_defs, query).unwrap();
+        let generated = ExprParser::new().parse(&model_def, query).unwrap();
 
         println!("Expected:");
         println!("{:?}\n", expected);
@@ -196,7 +224,7 @@ mod test {
 
     #[test]
     fn test_string_parsing() {
-        let field_defs = field_definitions();
+        let model_def = definition();
 
         let query = r#"!(name != "cant\"ona")"#;
 
@@ -207,7 +235,7 @@ mod test {
             LogicOp::Not,
             Expr::Comp(name_var.into(), CompOp::Neq, name_val.into()).into(),
         ));
-        let generated = ExprParser::new().parse(&field_defs, query).unwrap();
+        let generated = ExprParser::new().parse(&model_def, query).unwrap();
 
         println!("Expected:");
         println!("{:?}\n", expected);
@@ -220,29 +248,38 @@ mod test {
 
     #[test]
     fn test_null_values() {
-        let field_defs = field_definitions();
+        let model_def = definition();
         let query = r#"(org_id = null || start_date > null) && !(property_id = null || max_occupancy >= null)"#;
 
-        ExprParser::new().parse(&field_defs, query).unwrap();
+        ExprParser::new().parse(&model_def, query).unwrap();
     }
 
     #[test]
     fn test_boolean_values() {
-        let field_defs = field_definitions();
+        let model_def = definition();
         let query = r#"(org_id = null || start_date > null) && !(property_id = null || max_occupancy >= null) && closed = true"#;
 
-        ExprParser::new().parse(&field_defs, query).unwrap();
+        ExprParser::new().parse(&model_def, query).unwrap();
+    }
+
+    #[test]
+    fn test_related_field() {
+        let model_def = definition();
+        let query = r#"parent.parent.max_occupancy > "3""#;
+
+        ExprParser::new().parse(&model_def, query).unwrap();
     }
 
     #[test]
     fn test_sql_generation() {
-        let field_defs = field_definitions();
+        let model_def = definition();
         let query = r#"(org_id = "123" || start_date > "2021-01-01") && !(property_id = "444" || max_occupancy >= "4")"#;
 
-        let expr = ExprParser::new().parse(&field_defs, query).unwrap();
-        let (sql, bindings) = expr.to_sql(0);
+        let expr = ExprParser::new().parse(&model_def, query).unwrap();
+        let (sql, vars, bindings) = expr.to_sql(0);
 
         println!("{:?}", sql);
+        println!("{:?}", vars);
         println!("{:?}", bindings);
     }
 }

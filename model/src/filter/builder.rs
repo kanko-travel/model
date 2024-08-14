@@ -1,14 +1,13 @@
 use crate::Error;
 use crate::{
     filter::{ast::*, parser::ExprParser},
-    FieldDefinitionMap, FieldValue, Model,
+    FieldValue, Model,
 };
 
 #[derive(Debug, Clone)]
 enum Token {
     CompOp(CompOp),
     Var(String),
-    VarForeign(String),
     Val(FieldValue),
     Group(Filter),
     LogicOp(LogicOp),
@@ -26,12 +25,6 @@ impl Filter {
 
     pub fn field(mut self, name: &str) -> Self {
         self.tokens.push(Token::Var(name.into()));
-
-        self
-    }
-
-    pub fn foreign_field(mut self, name: &str) -> Self {
-        self.tokens.push(Token::VarForeign(name.into()));
 
         self
     }
@@ -117,59 +110,15 @@ impl Filter {
     }
 
     pub fn build<T: Model>(self) -> Result<Expr, Error> {
-        let FieldDefinitionMap(field_defs) = T::field_definitions().into();
+        let model_def = T::definition();
 
         let input = tokens_to_string(self.tokens);
 
         let expr = ExprParser::new()
-            .parse(&field_defs, &input)
+            .parse(&model_def, &input)
             .map_err(|err| Error::internal(&format!("{:?}", err)))?;
 
         Ok(*expr)
-    }
-
-    pub fn build_with_foreign<A: Model, B: Model>(mut self) -> Result<Expr, Error> {
-        let mut merged_defs = vec![];
-
-        for mut def in A::field_definitions().into_iter() {
-            def.name = format!("a.{}", def.name);
-            merged_defs.push(def)
-        }
-
-        for mut def in B::field_definitions().into_iter() {
-            def.name = format!("b.{}", def.name);
-            merged_defs.push(def)
-        }
-
-        self.disambiguate_vars_from_foreign();
-
-        let FieldDefinitionMap(field_defs) = merged_defs.into();
-
-        let input = tokens_to_string(self.tokens);
-
-        let expr = ExprParser::new()
-            .parse(&field_defs, &input)
-            .map_err(|err| Error::internal(&format!("{:?}", err)))?;
-
-        Ok(*expr)
-    }
-}
-
-impl Filter {
-    fn disambiguate_vars_from_foreign(&mut self) {
-        for tok in self.tokens.iter_mut() {
-            if let Token::Group(filter) = tok {
-                filter.disambiguate_vars_from_foreign()
-            }
-
-            if let Token::Var(var) = tok {
-                *var = format!("a.{}", var);
-            }
-
-            if let Token::VarForeign(var) = tok {
-                *var = format!("b.{}", var);
-            }
-        }
     }
 }
 
@@ -178,7 +127,7 @@ fn tokens_to_string(tokens: Vec<Token>) -> String {
         .into_iter()
         .map(|tok| match tok {
             Token::Group(b) => format!("({})", tokens_to_string(b.tokens)),
-            Token::Var(var) | Token::VarForeign(var) => var,
+            Token::Var(var) => var,
             Token::Val(val) => format!(r#""{}""#, val.to_string()),
             Token::CompOp(op) => op.to_string(),
             Token::LogicOp(op) => op.to_string(),
@@ -193,12 +142,12 @@ mod test {
     use chrono::NaiveDate;
     use uuid::Uuid;
 
-    use crate::{self as model};
+    use crate::{self as model, Related};
 
     use super::*;
 
     #[derive(Clone, Debug, Model)]
-    #[model(table_name = "example")]
+    #[model(table_name = "example", has_relations)]
     struct Example {
         #[model(id, primary_key)]
         id: Uuid,
@@ -216,6 +165,15 @@ mod test {
         #[model(id, primary_key)]
         id: Uuid,
         name: String,
+    }
+
+    impl Related for Example {
+        fn relation_definitions() -> Vec<crate::relation::RelationDef> {
+            vec![Self::belongs_to::<Organization>(
+                "organization".into(),
+                "organization_id".into(),
+            )]
+        }
     }
 
     #[test]
@@ -327,14 +285,11 @@ mod test {
     }
 
     #[test]
-    fn test_foreign_filter() {
+    fn test_related_filter() {
         Filter::new()
-            .field("start_date")
-            .gte(NaiveDate::from_ymd_opt(2022, 2, 20).unwrap())
-            .and()
-            .foreign_field("name")
-            .eq(String::from("Universal"))
-            .build_with_foreign::<Example, Organization>()
+            .field("organization.name")
+            .ilike("acme".to_string())
+            .build::<Example>()
             .unwrap();
     }
 }

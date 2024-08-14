@@ -3,8 +3,8 @@ use std::marker::PhantomData;
 
 use crate::cursor::Cursor;
 use crate::field_value::FieldValue;
-use crate::filter::ast::Expr;
-use crate::model::{FieldDefinitionMap, FieldType};
+use crate::filter::ast::{Expr, Var};
+use crate::model::FieldType;
 use crate::util::from_b64_str;
 use crate::Model;
 use schemars::gen::SchemaGenerator;
@@ -38,7 +38,7 @@ pub struct Query<T: Model> {
 
 #[derive(Clone, Debug)]
 pub struct Sort {
-    pub field: String,
+    pub field: Var,
     pub direction: SortDirection,
 }
 
@@ -84,7 +84,7 @@ impl<'de, T: Model> Deserialize<'de> for Query<T> {
         // debugging
         println!("successfully parsed query");
         let sql = query.filter.as_ref().map(|f| {
-            let (sql, _) = f.to_sql(0);
+            let (sql, _, _) = f.to_sql(0);
             sql
         });
         println!("filter: {:?}", sql);
@@ -116,17 +116,15 @@ impl<T: Model> TryFrom<RawQuery> for Query<T> {
 
     fn try_from(value: RawQuery) -> Result<Self, Self::Error> {
         let mut query = Query::new();
-
-        let FieldDefinitionMap(field_defs) = T::field_definitions().into();
+        let model_def = T::definition();
 
         if let Some(filter) = value.filter {
             query.filter = parse_filter::<T>(&filter)?.into();
         }
 
         if let Some(sort_by) = value.sort_by {
-            let field_def = field_defs
-                .get(&sort_by)
-                .ok_or_else(|| Error::bad_request("invalid sort_by field: field does not exist"))?;
+            let field = Var::from_sort_by_str::<T>(&sort_by)?;
+            let field_def = field.resolve_definition(&model_def)?;
 
             if let FieldType::Json = field_def.type_ {
                 return Err(Error::bad_request(
@@ -135,7 +133,7 @@ impl<T: Model> TryFrom<RawQuery> for Query<T> {
             }
 
             let mut sort = Sort {
-                field: sort_by.clone(),
+                field,
                 // this is the default sort direction
                 direction: SortDirection::Ascending,
             };

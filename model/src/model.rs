@@ -1,13 +1,61 @@
+use chrono::DateTime;
+use chrono::NaiveDate;
+use rust_decimal::Decimal;
+use serde_json::Value;
 use std::collections::HashMap;
+use std::str::FromStr;
 use uuid::Uuid;
 
+use crate::relation::RelationDef;
 use crate::Error;
 use crate::FieldValue;
+use crate::Related;
 
-pub trait Model {
+pub trait Model: Related {
     fn table_name() -> String;
     fn id_field_name() -> String;
     fn field_definitions() -> Vec<FieldDefinition>;
+    fn definition() -> ModelDef {
+        ModelDef {
+            table_name: Self::table_name,
+            id_field_name: Self::id_field_name,
+            field_definitions: Self::field_definitions,
+            relation_definitions: Self::relation_definitions,
+        }
+    }
+
+    fn belongs_to<R>(name: String, column: String) -> RelationDef
+    where
+        Self: Sized,
+        R: Model,
+    {
+        RelationDef::belongs_to::<Self, R>(name, column)
+    }
+
+    fn has_one<R>(name: String, column: String) -> RelationDef
+    where
+        Self: Sized,
+        R: Model,
+    {
+        RelationDef::has_one::<Self, R>(name, column)
+    }
+
+    fn has_many<R>(name: String, column: String) -> RelationDef
+    where
+        Self: Sized,
+        R: Model,
+    {
+        RelationDef::has_many::<Self, R>(name, column)
+    }
+
+    fn has_many_via<R>(name: String, junction_table_name: String) -> RelationDef
+    where
+        Self: Sized,
+        R: Model,
+    {
+        RelationDef::has_many_via::<Self, R>(name, junction_table_name)
+    }
+
     fn id_field_value(&self) -> Uuid;
     fn field_value(&self, field: &str) -> Result<FieldValue, Error>;
     fn fields(&self) -> Result<Vec<(FieldDefinition, FieldValue)>, Error> {
@@ -23,6 +71,14 @@ pub trait Model {
     }
 }
 
+#[derive(Debug)]
+pub struct ModelDef {
+    pub table_name: fn() -> String,
+    pub id_field_name: fn() -> String,
+    pub field_definitions: fn() -> Vec<FieldDefinition>,
+    pub relation_definitions: fn() -> Vec<RelationDef>,
+}
+
 pub trait Enum: Sized {
     fn try_from_string(value: String) -> Result<Self, Error>;
     fn to_string(self) -> String;
@@ -30,7 +86,7 @@ pub trait Enum: Sized {
     fn variants() -> Vec<String>;
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct FieldDefinition {
     pub name: String,
     pub type_: FieldType,
@@ -86,6 +142,49 @@ impl FieldType {
             Self::Json => "jsonb",
             Self::Enum(_) => "text",
         }
+    }
+
+    pub fn parse_value(&self, value: &str) -> Result<FieldValue, Error> {
+        let field_value = match self {
+            FieldType::Uuid => Uuid::parse_str(value)
+                .map_err(|_| Error::bad_request("invalid uuid"))?
+                .into(),
+            FieldType::Bool => bool::from_str(value)
+                .map_err(|_| Error::bad_request("invalid bool"))?
+                .into(),
+            FieldType::Int => i64::from_str(value)
+                .map_err(|_| Error::bad_request("invalid int"))?
+                .into(),
+            FieldType::Int32 => i32::from_str(value)
+                .map_err(|_| Error::bad_request("invalid i32"))?
+                .into(),
+            FieldType::Float => f64::from_str(value)
+                .map_err(|_| Error::bad_request("invalid f64"))?
+                .into(),
+            FieldType::Decimal => Decimal::from_str(value)
+                .map_err(|_| Error::bad_request("invalid decimal"))?
+                .into(),
+            FieldType::String => value.to_string().into(),
+            FieldType::Date => NaiveDate::parse_from_str(value, "%Y-%m-%d")
+                .map_err(|_| Error::bad_request("invalid date"))?
+                .into(),
+            FieldType::DateTime => DateTime::parse_from_rfc3339(value)
+                .map_err(|_| Error::bad_request("invalid datetime"))?
+                .into(),
+            FieldType::Enum(variants) => {
+                variants
+                    .iter()
+                    .find(|&v| v == value)
+                    .ok_or_else(|| Error::bad_request("invalid enum variant"))?;
+
+                FieldValue::Enum(value.to_string().into())
+            }
+            FieldType::Json => Value::from_str(value)
+                .map_err(|_| Error::bad_request("invalid json"))?
+                .into(),
+        };
+
+        Ok(field_value)
     }
 }
 
