@@ -48,7 +48,7 @@ impl Related for Student {
 impl Related for Course {
     fn relation_definitions() -> Vec<RelationDef> {
         vec![Self::has_many_via::<Student>(
-            "students".into(),
+            "registered_students".into(),
             "student_registered_courses".into(),
         )]
     }

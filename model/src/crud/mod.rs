@@ -39,7 +39,21 @@ where
                 .field(&(relation.model_definition.id_field_name)())
                 .eq(self.field_value(&column)?),
             Reference::To(column) => Filter::new().field(&column).eq(self.id_field_value()),
-            _ => unimplemented!(),
+            Reference::Via((junction_table, _, _)) => {
+                // find the reverse relation
+                let mut related_defs =
+                    (relation.model_definition.relation_definitions)().into_iter();
+
+                let reverse_relation =
+                    related_defs.find(|related_def| match &related_def.reference {
+                        Reference::Via((j_table, _, _)) => j_table == &junction_table,
+                        _ => false,
+                    }).ok_or_else(|| Error::bad_request("reverse relation doesn't exist for many-to-many relation. reverse relation must be defined in order to retrieve related entities"))?;
+
+                let filter_field = format!("{}.{}", reverse_relation.name, Self::id_field_name());
+
+                Filter::new().field(&filter_field).eq(self.id_field_value())
+            }
         };
 
         Ok(Select::new().with_filter(filter))
