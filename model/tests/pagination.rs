@@ -1,8 +1,8 @@
 use std::{fs::File, io::BufReader, path::Path, str::FromStr};
 
-use model::{Crud, Cursor, Filter, Migration, Model, Query, Sort};
+use model::{schema, Crud, Cursor, Filter, Model, Query, Sort};
 use serde::{Deserialize, Serialize};
-use sqlx::{prelude::FromRow, PgPool, Postgres, Transaction};
+use sqlx::{prelude::FromRow, PgConnection, PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
 #[derive(Clone, Debug, Serialize, Deserialize, Model, FromRow)]
@@ -21,7 +21,12 @@ async fn create_db_pool() -> PgPool {
 }
 
 async fn setup_tables(tx: &mut Transaction<'_, Postgres>) {
-    Dummy::migrate(tx).await.unwrap();
+    let ddl = schema!(Dummy);
+
+    sqlx::query(&ddl)
+        .execute(tx as &mut PgConnection)
+        .await
+        .unwrap();
 }
 
 async fn insert_records(tx: &mut Transaction<'_, Postgres>) {
