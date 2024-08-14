@@ -42,7 +42,7 @@ pub trait Migration: Model {
                     );
 
                     let create_statement = format!(
-                        "CREATE TABLE {} ({}, {}, {}, {})",
+                        "CREATE TABLE IF NOT EXISTS {} ({}, {}, {}, {})",
                         junction_table,
                         columns,
                         primary_key,
