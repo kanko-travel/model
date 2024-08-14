@@ -1,5 +1,5 @@
-use model::{Migration, Model, Related, RelationDef};
-use sqlx::PgPool;
+use model::{schema, Model, Related, RelationDef};
+use sqlx::{PgConnection, PgPool};
 use uuid::Uuid;
 
 async fn create_db_pool() -> PgPool {
@@ -68,13 +68,14 @@ async fn test_relations() {
     let pool = create_db_pool().await;
     let mut tx = pool.begin().await.unwrap();
 
-    Dorm::migrate(&mut tx).await.unwrap();
-    Student::migrate(&mut tx).await.unwrap();
-    Course::migrate(&mut tx).await.unwrap();
+    let ddl = schema!(Dorm, Student, Course);
 
-    Dorm::migrate_relations(&mut tx).await.unwrap();
-    Student::migrate_relations(&mut tx).await.unwrap();
-    Course::migrate_relations(&mut tx).await.unwrap();
+    for part in ddl.split("\n\n") {
+        sqlx::query(&part)
+            .execute(&mut tx as &mut PgConnection)
+            .await
+            .unwrap();
+    }
 
     tx.commit().await.unwrap();
 }

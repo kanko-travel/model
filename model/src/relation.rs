@@ -144,7 +144,7 @@ fn junction_table_column(table: &str, column: &str) -> String {
 
 #[cfg(test)]
 mod test {
-    use crate as model;
+    use crate::{self as model, schema};
 
     use crate::Model;
     use uuid::Uuid;
@@ -215,5 +215,9 @@ mod test {
         println!("{:?}", student_relations);
         println!("{:?}", course_relations);
         println!("{:?}", dorm_relations);
+
+        let ddl = schema!(Student, Course, Dorm);
+
+        println!("{}", ddl);
     }
 }
