@@ -59,11 +59,25 @@ impl OrderBy {
 
     fn to_string(&self, id_field_name: &str) -> String {
         match &self {
-            OrderBy::IdAsc | OrderBy::SecondaryAsc(_) => {
-                format!("{} ASC", self.field_name(id_field_name))
+            OrderBy::IdAsc => {
+                format!("{} ASC", id_field_name)
             }
-            OrderBy::IdDesc | OrderBy::SecondaryDesc(_) => {
-                format!("{} DESC", self.field_name(id_field_name))
+            OrderBy::SecondaryAsc(_) => {
+                format!(
+                    "{} ASC, {} ASC",
+                    self.field_name(id_field_name),
+                    id_field_name
+                )
+            }
+            OrderBy::IdDesc => {
+                format!("{} DESC", id_field_name)
+            }
+            OrderBy::SecondaryDesc(_) => {
+                format!(
+                    "{} DESC, {} DESC",
+                    self.field_name(id_field_name),
+                    id_field_name
+                )
             }
         }
     }
