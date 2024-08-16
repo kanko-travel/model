@@ -289,6 +289,7 @@ fn parse_attributes(attrs: &[Attribute]) -> (bool, bool, bool, bool, bool, bool,
                     match nested {
                         syn::NestedMeta::Meta(Meta::Path(path)) if path.is_ident("id") => {
                             id = true;
+                            unique = true;
                             immutable = true;
                         }
                         syn::NestedMeta::Meta(Meta::Path(path)) if path.is_ident("json") => {
