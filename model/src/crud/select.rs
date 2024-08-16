@@ -96,6 +96,17 @@ impl<T: Model> Select<T> {
         query.try_into()
     }
 
+    pub fn with_query(mut self, query: Query<T>) -> Result<Self, Error> {
+        let other: Select<T> = query.try_into()?;
+
+        self.filters.extend(other.filters);
+        self.limit = other.limit;
+        self.order_by = other.order_by;
+        self.cursor = other.cursor;
+
+        Ok(self)
+    }
+
     pub fn with_filter(mut self, filter: Filter) -> Self {
         self.filters.push(filter);
         self
