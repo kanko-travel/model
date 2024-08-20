@@ -87,23 +87,24 @@ impl RelationDef {
             Reference::From(column) => {
                 format!(
                     "LEFT JOIN {} AS {} ON {}.{} = {}.{}",
-                    related_table, alias, parent, column, related_table, related_id_column
+                    related_table, alias, parent, column, alias, related_id_column
                 )
             }
             Reference::To(column) => {
                 format!(
                     "LEFT JOIN {} AS {} ON {}.{} = {}.{}",
-                    related_table, alias, parent, parent_id_column, related_table, column,
+                    related_table, alias, parent, parent_id_column, alias, column,
                 )
             }
             Reference::Via((junction_table, from_reference, to_reference)) => {
                 let join_junction = format!(
-                    "LEFT JOIN {} AS {}_{} ON {}.{} = {}.{}",
+                    "LEFT JOIN {} AS {}_{} ON {}.{} = {}_{}.{}",
                     junction_table,
                     parent,
                     junction_table,
                     parent,
                     parent_id_column,
+                    parent,
                     junction_table,
                     from_reference,
                 );
@@ -115,7 +116,7 @@ impl RelationDef {
                     parent,
                     junction_table,
                     to_reference,
-                    related_table,
+                    alias,
                     related_id_column,
                 );
 
