@@ -18,6 +18,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    user: buildkite-agent
     working_dir: /app
     volumes:
       - .:/app
