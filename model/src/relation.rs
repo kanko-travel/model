@@ -80,50 +80,50 @@ impl RelationDef {
         match &self.reference {
             Reference::From(column) => {
                 format!(
-                    "LEFT JOIN {} ON {}.{} = {}.{} AS {}_{}",
+                    "LEFT JOIN {} AS {}_{} ON {}.{} = {}.{}",
+                    related_table,
+                    parent,
                     related_table,
                     parent,
                     column,
                     related_table,
-                    related_id_column,
-                    parent,
-                    related_table
+                    related_id_column
                 )
             }
             Reference::To(column) => {
                 format!(
-                    "LEFT JOIN {} ON {}.{} = {}.{} AS {}_{}",
+                    "LEFT JOIN {} AS {}_{} ON {}.{} = {}.{}",
+                    related_table,
+                    parent,
                     related_table,
                     parent,
                     parent_id_column,
                     related_table,
                     column,
-                    parent,
-                    related_table
                 )
             }
             Reference::Via((junction_table, from_reference, to_reference)) => {
                 let join_junction = format!(
-                    "LEFT JOIN {} ON {}.{} = {}.{} AS {}_{}",
+                    "LEFT JOIN {} AS {}_{} ON {}.{} = {}.{}",
+                    junction_table,
+                    parent,
                     junction_table,
                     parent,
                     parent_id_column,
                     junction_table,
                     from_reference,
-                    parent,
-                    junction_table
                 );
 
                 let join_relation = format!(
-                    "INNER JOIN {} ON {}_{}.{} = {}.{} AS {}_{}",
+                    "INNER JOIN {} AS {}_{} ON {}_{}.{} = {}.{}",
+                    related_table,
+                    parent,
                     related_table,
                     parent,
                     junction_table,
                     to_reference,
                     related_table,
                     related_id_column,
-                    parent,
-                    related_table
                 );
 
                 format!(
