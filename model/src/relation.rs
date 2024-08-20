@@ -73,33 +73,27 @@ impl RelationDef {
         }
     }
 
-    pub fn to_join_clause(&self, parent: &str, parent_id_column: &str) -> String {
+    pub fn to_join_clause(&self, parent: &str, parent_id_column: &str, is_root: bool) -> String {
         let related_table = (self.model_definition.table_name)();
         let related_id_column = (self.model_definition.id_field_name)();
+
+        let alias = if is_root {
+            self.name.clone()
+        } else {
+            format!("{}_{}", parent, self.name)
+        };
 
         match &self.reference {
             Reference::From(column) => {
                 format!(
-                    "LEFT JOIN {} AS {}_{} ON {}.{} = {}.{}",
-                    related_table,
-                    parent,
-                    related_table,
-                    parent,
-                    column,
-                    related_table,
-                    related_id_column
+                    "LEFT JOIN {} AS {} ON {}.{} = {}.{}",
+                    related_table, alias, parent, column, related_table, related_id_column
                 )
             }
             Reference::To(column) => {
                 format!(
-                    "LEFT JOIN {} AS {}_{} ON {}.{} = {}.{}",
-                    related_table,
-                    parent,
-                    related_table,
-                    parent,
-                    parent_id_column,
-                    related_table,
-                    column,
+                    "LEFT JOIN {} AS {} ON {}.{} = {}.{}",
+                    related_table, alias, parent, parent_id_column, related_table, column,
                 )
             }
             Reference::Via((junction_table, from_reference, to_reference)) => {
@@ -115,10 +109,9 @@ impl RelationDef {
                 );
 
                 let join_relation = format!(
-                    "INNER JOIN {} AS {}_{} ON {}_{}.{} = {}.{}",
+                    "INNER JOIN {} AS {} ON {}_{}.{} = {}.{}",
                     related_table,
-                    parent,
-                    related_table,
+                    alias,
                     parent,
                     junction_table,
                     to_reference,

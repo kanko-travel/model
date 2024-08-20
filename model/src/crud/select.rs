@@ -555,8 +555,10 @@ fn generate_join_clause<T: Model>(vars: &Vec<Var>) -> Result<String, Error> {
     let mut seen = HashSet::new();
     let mut join_clauses = vec![];
 
+    let table_name = T::table_name();
+
     for var in vars.iter() {
-        let joins = joins_from_var(&T::table_name(), var, &T::definition())?;
+        let joins = joins_from_var(&table_name, &table_name, var, &T::definition())?;
 
         for (relation, join_clause) in joins.iter() {
             if seen.insert(relation.clone()) {
@@ -569,6 +571,7 @@ fn generate_join_clause<T: Model>(vars: &Vec<Var>) -> Result<String, Error> {
 }
 
 fn joins_from_var(
+    root: &str,
     parent: &str,
     var: &Var,
     model_def: &ModelDef,
@@ -583,13 +586,14 @@ fn joins_from_var(
                 .ok_or_else(|| Error::bad_request("undefined field"))?;
 
             let id_field_name = (model_def.id_field_name)();
-            let join_clause = relation_def.to_join_clause(&parent, &id_field_name);
+            let join_clause = relation_def.to_join_clause(&parent, &id_field_name, root == parent);
 
             let next_parent = format!("{}_{}", parent, name);
 
             let mut res = vec![(next_parent.clone(), join_clause)];
 
             res.extend(joins_from_var(
+                &root,
                 &next_parent,
                 var.as_ref(),
                 &relation_def.model_definition,
