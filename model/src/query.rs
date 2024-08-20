@@ -84,7 +84,7 @@ impl<'de, T: Model> Deserialize<'de> for Query<T> {
         // debugging
         println!("successfully parsed query");
         let sql = query.filter.as_ref().map(|f| {
-            let (sql, _, _) = f.to_sql(0);
+            let (sql, _, _) = f.to_sql::<T>(0);
             sql
         });
         println!("filter: {:?}", sql);
