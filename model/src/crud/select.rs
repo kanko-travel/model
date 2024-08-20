@@ -50,7 +50,54 @@ impl OrderBy {
         }
     }
 
-    fn field_reference<T: Model>(&self) -> String {
+    fn selects<T: Model>(&self) -> String {
+        match &self {
+            OrderBy::IdAsc | OrderBy::IdDesc => {
+                format!("{} AS _order_by_primary", self.primary_field::<T>())
+            }
+            OrderBy::SecondaryAsc(_) | OrderBy::SecondaryDesc(_) => {
+                format!(
+                    "{} AS _order_by_primary, {}.{} AS _order_by_secondary",
+                    self.primary_field::<T>(),
+                    T::table_name(),
+                    T::id_field_name()
+                )
+            }
+        }
+    }
+
+    fn to_sql<T: Model>(&self) -> String {
+        match &self {
+            OrderBy::IdAsc => {
+                "_order_by_primary ASC".into()
+                // format!("{}.{} ASC", T::table_name(), T::id_field_name())
+            }
+            OrderBy::SecondaryAsc(_) => {
+                "_order_by_primary ASC, _order_by_secondary ASC".into()
+                // format!(
+                //     "{} ASC, {}.{} ASC",
+                //     self.primary_field::<T>(),
+                //     T::table_name(),
+                //     T::id_field_name()
+                // )
+            }
+            OrderBy::IdDesc => {
+                "_order_by_primary DESC".into()
+                // format!("{}.{} DESC", T::table_name(), T::id_field_name())
+            }
+            OrderBy::SecondaryDesc(_) => {
+                "_order_by_primary DESC, _order_by_secondary DESC".into()
+                // format!(
+                //     "{} DESC, {}.{} DESC",
+                //     self.primary_field::<T>(),
+                //     T::table_name(),
+                //     T::id_field_name()
+                // )
+            }
+        }
+    }
+
+    fn primary_field<T: Model>(&self) -> String {
         match &self {
             OrderBy::IdAsc | OrderBy::IdDesc => {
                 format!("{}.{}", T::table_name(), T::id_field_name())
@@ -63,33 +110,6 @@ impl OrderBy {
                 }
 
                 reference
-            }
-        }
-    }
-
-    fn to_sql<T: Model>(&self) -> String {
-        match &self {
-            OrderBy::IdAsc => {
-                format!("{}.{} ASC", T::table_name(), T::id_field_name())
-            }
-            OrderBy::SecondaryAsc(_) => {
-                format!(
-                    "{} ASC, {}.{} ASC",
-                    self.field_reference::<T>(),
-                    T::table_name(),
-                    T::id_field_name()
-                )
-            }
-            OrderBy::IdDesc => {
-                format!("{}.{} DESC", T::table_name(), T::id_field_name())
-            }
-            OrderBy::SecondaryDesc(_) => {
-                format!(
-                    "{} DESC, {}.{} DESC",
-                    self.field_reference::<T>(),
-                    T::table_name(),
-                    T::id_field_name()
-                )
             }
         }
     }
@@ -245,9 +265,10 @@ impl<T: Model> Select<T> {
 
         let id_field_name = T::id_field_name();
         let select_clause = format!(
-            "SELECT DISTINCT {}.*, {}::text AS _cursor FROM {}",
+            "SELECT DISTINCT {}.*, {}::text AS _cursor, {} FROM {}",
             self.select_path,
-            self.order_by.field_reference::<T>(),
+            self.order_by.primary_field::<T>(),
+            self.order_by.selects::<T>(),
             table_name
         );
 
