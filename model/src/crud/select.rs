@@ -50,33 +50,45 @@ impl OrderBy {
         }
     }
 
-    fn field_name(&self, id_field_name: &str) -> String {
+    fn field_reference<T: Model>(&self) -> String {
         match &self {
-            OrderBy::IdAsc | OrderBy::IdDesc => id_field_name.into(),
-            OrderBy::SecondaryAsc(var) | OrderBy::SecondaryDesc(var) => var.to_string(),
+            OrderBy::IdAsc | OrderBy::IdDesc => {
+                format!("{}.{}", T::table_name(), T::id_field_name())
+            }
+            OrderBy::SecondaryAsc(var) | OrderBy::SecondaryDesc(var) => {
+                let mut reference = var.to_string();
+
+                if matches!(var, Var::Leaf(_)) {
+                    reference = format!("{}.{}", T::table_name(), reference);
+                }
+
+                reference
+            }
         }
     }
 
-    fn to_string(&self, id_field_name: &str) -> String {
+    fn to_sql<T: Model>(&self) -> String {
         match &self {
             OrderBy::IdAsc => {
-                format!("{} ASC", id_field_name)
+                format!("{}.{} ASC", T::table_name(), T::id_field_name())
             }
             OrderBy::SecondaryAsc(_) => {
                 format!(
-                    "{} ASC, {} ASC",
-                    self.field_name(id_field_name),
-                    id_field_name
+                    "{} ASC, {}.{} ASC",
+                    self.field_reference::<T>(),
+                    T::table_name(),
+                    T::id_field_name()
                 )
             }
             OrderBy::IdDesc => {
-                format!("{} DESC", id_field_name)
+                format!("{}.{} DESC", T::table_name(), T::id_field_name())
             }
             OrderBy::SecondaryDesc(_) => {
                 format!(
-                    "{} DESC, {} DESC",
-                    self.field_name(id_field_name),
-                    id_field_name
+                    "{} DESC, {}.{} DESC",
+                    self.field_reference::<T>(),
+                    T::table_name(),
+                    T::id_field_name()
                 )
             }
         }
@@ -235,7 +247,7 @@ impl<T: Model> Select<T> {
         let select_clause = format!(
             "SELECT DISTINCT {}.*, {}::text AS _cursor FROM {}",
             self.select_path,
-            self.order_by.field_name(&id_field_name),
+            self.order_by.field_reference::<T>(),
             table_name
         );
 
@@ -252,7 +264,7 @@ impl<T: Model> Select<T> {
         let mut var_bindings = vec![];
 
         for expr in exprs.into_iter() {
-            let (sql, v, b) = expr.to_sql(var_bindings.len());
+            let (sql, v, b) = expr.to_sql::<T>(var_bindings.len());
 
             predicates.push(sql);
             vars.extend(v);
@@ -269,12 +281,12 @@ impl<T: Model> Select<T> {
                 let inverse_cursor_filter =
                     build_cursor_filter::<T>(cursor, &id_field_name, &self.order_by.inverse())?;
 
-                let (sql, v, b) = cursor_filter.to_sql(var_bindings.len());
+                let (sql, v, b) = cursor_filter.to_sql::<T>(var_bindings.len());
                 predicates.push(sql);
                 vars.extend(v);
                 var_bindings.extend(b);
 
-                let (sql, _, b) = inverse_cursor_filter.to_sql(var_bindings.len());
+                let (sql, _, b) = inverse_cursor_filter.to_sql::<T>(var_bindings.len());
                 inverse_predicates.push(sql);
                 var_bindings.extend(b);
 
@@ -287,16 +299,16 @@ impl<T: Model> Select<T> {
                 let inverse_where_clause = format!("WHERE {}", inverse_predicate);
 
                 let group_by_clause = if join_clause != "" {
-                    format!("GROUP BY {}", id_field_name)
+                    format!("GROUP BY {}.{}", table_name, id_field_name)
                 } else {
                     "".into()
                 };
 
-                let order_by = self.order_by.to_string(&id_field_name);
+                let order_by = self.order_by.to_sql::<T>();
 
                 let order_by_clause = format!("ORDER BY {}", order_by);
 
-                let inverse_order_by = self.order_by.inverse().to_string(&id_field_name);
+                let inverse_order_by = self.order_by.inverse().to_sql::<T>();
 
                 let inverse_order_by_clause = format!("ORDER BY {}", inverse_order_by);
 
@@ -363,12 +375,12 @@ impl<T: Model> Select<T> {
                 let where_clause = format!("WHERE {}", predicate);
 
                 let group_by_clause = if join_clause != "" {
-                    format!("GROUP BY {}", id_field_name)
+                    format!("GROUP BY {}.{}", table_name, id_field_name)
                 } else {
                     "".into()
                 };
 
-                let order_by = self.order_by.to_string(&id_field_name);
+                let order_by = self.order_by.to_sql::<T>();
 
                 let order_by_clause = format!("ORDER BY {}", order_by);
 

@@ -172,17 +172,29 @@ impl Expr {
         Ok(*boxed)
     }
 
-    pub fn to_sql(&self, var_binding_idx_offset: usize) -> (String, Vec<Var>, Vec<FieldValue>) {
+    pub fn to_sql<T: Model>(
+        &self,
+        var_binding_idx_offset: usize,
+    ) -> (String, Vec<Var>, Vec<FieldValue>) {
         match self {
-            Expr::Var(var) => (var.to_sql(), vec![var.clone()], vec![]),
+            Expr::Var(var) => {
+                let mut sql = var.to_sql();
+
+                if matches!(var, Var::Leaf(_)) {
+                    sql = format!("{}.{}", T::table_name(), sql);
+                }
+
+                (sql, vec![var.clone()], vec![])
+            }
             Expr::Val(val) => {
                 let sql = format!("${}", var_binding_idx_offset + 1);
                 (sql, vec![], vec![val.clone()])
             }
             Expr::Comp(a_expr, op, b_expr) => {
-                let (a_sql, mut a_vars, mut a_bindings) = a_expr.to_sql(var_binding_idx_offset);
+                let (a_sql, mut a_vars, mut a_bindings) =
+                    a_expr.to_sql::<T>(var_binding_idx_offset);
                 let (b_sql, b_vars, b_bindings) =
-                    b_expr.to_sql(var_binding_idx_offset + a_bindings.len());
+                    b_expr.to_sql::<T>(var_binding_idx_offset + a_bindings.len());
                 let op_sql = op.to_sql();
 
                 let sql = format!("{} {} {}", a_sql, op_sql, b_sql);
@@ -192,7 +204,7 @@ impl Expr {
                 (sql, a_vars, a_bindings)
             }
             Expr::Neg(op, expr) => {
-                let (expr_sql, vars, expr_bindings) = expr.to_sql(var_binding_idx_offset);
+                let (expr_sql, vars, expr_bindings) = expr.to_sql::<T>(var_binding_idx_offset);
                 let op_sql = op.to_sql();
 
                 let sql = format!("({} ({}))", op_sql, expr_sql);
@@ -200,9 +212,10 @@ impl Expr {
                 (sql, vars, expr_bindings)
             }
             Expr::Conj(a_expr, op, b_expr) => {
-                let (a_sql, mut a_vars, mut a_bindings) = a_expr.to_sql(var_binding_idx_offset);
+                let (a_sql, mut a_vars, mut a_bindings) =
+                    a_expr.to_sql::<T>(var_binding_idx_offset);
                 let (b_sql, b_vars, b_bindings) =
-                    b_expr.to_sql(var_binding_idx_offset + a_bindings.len());
+                    b_expr.to_sql::<T>(var_binding_idx_offset + a_bindings.len());
                 let op_sql = op.to_sql();
 
                 let sql = format!("({} {} {})", a_sql, op_sql, b_sql);
@@ -212,9 +225,10 @@ impl Expr {
                 (sql, a_vars, a_bindings)
             }
             Expr::Disj(a_expr, op, b_expr) => {
-                let (a_sql, mut a_vars, mut a_bindings) = a_expr.to_sql(var_binding_idx_offset);
+                let (a_sql, mut a_vars, mut a_bindings) =
+                    a_expr.to_sql::<T>(var_binding_idx_offset);
                 let (b_sql, b_vars, b_bindings) =
-                    b_expr.to_sql(var_binding_idx_offset + a_bindings.len());
+                    b_expr.to_sql::<T>(var_binding_idx_offset + a_bindings.len());
                 let op_sql = op.to_sql();
 
                 let sql = format!("({} {} {})", a_sql, op_sql, b_sql);

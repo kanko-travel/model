@@ -11,8 +11,11 @@ mod test {
         ast::{CompOp, Expr, LogicOp},
         parser::ExprParser,
     };
+    use crate as model;
     use crate::{relation::RelationDef, FieldDefinition, FieldType, FieldValue, ModelDef};
     use chrono::NaiveDate;
+    use model_derive::Model;
+    use uuid::Uuid;
 
     fn definition() -> ModelDef {
         ModelDef {
@@ -273,10 +276,22 @@ mod test {
     #[test]
     fn test_sql_generation() {
         let model_def = definition();
+
+        #[derive(Clone, Debug, Model)]
+        #[model(table_name = "dummy")]
+        struct Dummy {
+            #[model(id, primary_key)]
+            id: Uuid,
+            org_id: i64,
+            start_date: NaiveDate,
+            property_id: i64,
+            max_occupancy: i64,
+        }
+
         let query = r#"(org_id = "123" || start_date > "2021-01-01") && !(property_id = "444" || max_occupancy >= "4")"#;
 
         let expr = ExprParser::new().parse(&model_def, query).unwrap();
-        let (sql, vars, bindings) = expr.to_sql(0);
+        let (sql, vars, bindings) = expr.to_sql::<Dummy>(0);
 
         println!("{:?}", sql);
         println!("{:?}", vars);
