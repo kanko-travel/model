@@ -27,8 +27,17 @@ pub enum LogicOp {
 }
 
 impl Var {
-    fn to_sql(&self) -> String {
-        self.to_string()
+    pub fn to_sql(&self) -> String {
+        match self {
+            Self::Leaf(val) => val.into(),
+            Self::Node((name, var)) => {
+                if let Self::Leaf(_) = var.as_ref() {
+                    format!("{}.{}", name, var.to_sql())
+                } else {
+                    format!("{}_{}", name, var.to_sql())
+                }
+            }
+        }
     }
 
     pub fn resolve_definition(&self, model_def: &ModelDef) -> Result<FieldDefinition, Error> {
@@ -76,14 +85,6 @@ impl Var {
             .parse(&model_def, input)
             .map_err(|err| Error::bad_request(&format!("invalid sort_by: {:?}", err)))?;
 
-        // let expr = *boxed;
-
-        // if let Expr::Var(var) = expr {
-        //     return Ok(var)
-        // };
-
-        // Err(Error::bad_request("invalid "))
-
         Ok(var)
     }
 }
@@ -93,11 +94,7 @@ impl ToString for Var {
         match self {
             Self::Leaf(val) => val.into(),
             Self::Node((name, var)) => {
-                if let Self::Leaf(_) = var.as_ref() {
-                    format!("{}.{}", name, var.to_sql())
-                } else {
-                    format!("{}_{}", name, var.to_sql())
-                }
+                format!("{}.{}", name, var.to_sql())
             }
         }
     }
