@@ -110,7 +110,7 @@ impl RelationDef {
                 );
 
                 let join_relation = format!(
-                    "INNER JOIN {} AS {} ON {}_{}.{} = {}.{}",
+                    "LEFT JOIN {} AS {} ON {}_{}.{} = {}.{}",
                     related_table,
                     alias,
                     parent,
