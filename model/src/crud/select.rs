@@ -260,7 +260,7 @@ impl<T: Model> Select<T> {
 
         let id_field_name = T::id_field_name();
         let select_clause = format!(
-            "SELECT DISTINCT {}.*, {} FROM {}",
+            "SELECT {}.*, {} FROM {}",
             self.select_path,
             self.order_by.selects::<T>(),
             table_name
@@ -365,8 +365,14 @@ impl<T: Model> Select<T> {
                             {}
                             {}
                             {}
+                            {}
                     ",
-                    select_clause, where_clause, group_by_clause, order_by_clause, limit_clause
+                    select_clause,
+                    join_clause,
+                    where_clause,
+                    group_by_clause,
+                    order_by_clause,
+                    limit_clause
                 );
 
                 let previous_page_query = format!(
