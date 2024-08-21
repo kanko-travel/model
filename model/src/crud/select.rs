@@ -634,7 +634,11 @@ fn joins_from_var(
             let id_field_name = (model_def.id_field_name)();
             let join_clause = relation_def.to_join_clause(&parent, &id_field_name, root == parent);
 
-            let next_parent = format!("{}_{}", parent, name);
+            let next_parent = if root == parent {
+                name.clone()
+            } else {
+                format!("{}_{}", parent, name)
+            };
 
             let mut res = vec![(next_parent.clone(), join_clause)];
 
