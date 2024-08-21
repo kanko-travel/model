@@ -261,6 +261,8 @@ impl<T: Model> Select<T> {
     /// prepares a query statement that fetches a max size of limit * 2 + 1.
     /// includes limit + 1 rows after the provided cursor and limit rows before
     pub(crate) fn prepare(&self, exprs: Vec<Expr>) -> Result<(String, Vec<FieldValue>), Error> {
+        tracing::info!("preparing select statement");
+
         let table_name = T::table_name();
 
         let id_field_name = T::id_field_name();
@@ -271,6 +273,8 @@ impl<T: Model> Select<T> {
             self.order_by.selects::<T>(),
             table_name
         );
+
+        tracing::info!("select clause: {}", select_clause);
 
         let mut vars = vec![];
 
@@ -287,6 +291,8 @@ impl<T: Model> Select<T> {
         for expr in exprs.into_iter() {
             let (sql, v, b) = expr.to_sql::<T>(var_bindings.len());
 
+            tracing::info!("pushing predicate: {}", sql);
+
             predicates.push(sql);
             vars.extend(v);
             var_bindings.extend(b);
@@ -296,6 +302,8 @@ impl<T: Model> Select<T> {
             Some(cursor) => {
                 let mut inverse_predicates = predicates.clone();
 
+                tracing::info!("building cursor filter");
+
                 let cursor_filter =
                     build_cursor_filter::<T>(cursor, &id_field_name, &self.order_by)?;
 
@@ -303,15 +311,25 @@ impl<T: Model> Select<T> {
                     build_cursor_filter::<T>(cursor, &id_field_name, &self.order_by.inverse())?;
 
                 let (sql, v, b) = cursor_filter.to_sql::<T>(var_bindings.len());
+
+                tracing::info!("cursor predicate: {}", sql);
+
                 predicates.push(sql);
                 vars.extend(v);
                 var_bindings.extend(b);
 
                 let (sql, _, b) = inverse_cursor_filter.to_sql::<T>(var_bindings.len());
+
+                tracing::info!("inverse cursor predicate: {}", sql);
+
                 inverse_predicates.push(sql);
                 var_bindings.extend(b);
 
+                tracing::info!("building join clause");
+
                 let join_clause = generate_join_clause::<T>(&vars)?;
+
+                tracing::info!("join clause: {}", join_clause);
 
                 let predicate = predicates.join(" AND ");
                 let where_clause = format!("WHERE {}", predicate);
@@ -325,13 +343,19 @@ impl<T: Model> Select<T> {
                     "".into()
                 };
 
-                let order_by = self.order_by.to_sql::<T>();
+                tracing::info!("building order_by clause");
 
+                let order_by = self.order_by.to_sql::<T>();
                 let order_by_clause = format!("ORDER BY {}", order_by);
 
-                let inverse_order_by = self.order_by.inverse().to_sql::<T>();
+                tracing::info!("order_by clause: {}", order_by_clause);
 
+                tracing::info!("building inverse_order_by cluase");
+
+                let inverse_order_by = self.order_by.inverse().to_sql::<T>();
                 let inverse_order_by_clause = format!("ORDER BY {}", inverse_order_by);
+
+                tracing::info!("inverse_order_by clause: {}", inverse_order_by_clause);
 
                 let limit = match self.limit {
                     Some(limit) if limit > 0 => limit,
@@ -391,7 +415,12 @@ impl<T: Model> Select<T> {
                 )
             }
             _ => {
+                tracing::info!("building join clause");
+
                 let join_clause = generate_join_clause::<T>(&vars)?;
+
+                tracing::info!("join clause: {}", join_clause);
+
                 let predicate = predicates.join(" AND ");
                 let where_clause = format!("WHERE {}", predicate);
 
@@ -401,9 +430,12 @@ impl<T: Model> Select<T> {
                     "".into()
                 };
 
-                let order_by = self.order_by.to_sql::<T>();
+                tracing::info!("building order_by clause");
 
+                let order_by = self.order_by.to_sql::<T>();
                 let order_by_clause = format!("ORDER BY {}", order_by);
+
+                tracing::info!("order_by clause: {}", order_by_clause);
 
                 let limit = match self.limit {
                     Some(limit) if limit > 0 => limit,
@@ -442,7 +474,7 @@ impl<T: Model> Select<T> {
         }
 
         // debugging
-        println!("{}", statement);
+        tracing::info!("{}", statement);
 
         Ok((statement, var_bindings))
     }
