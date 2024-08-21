@@ -51,25 +51,28 @@ impl OrderBy {
     }
 
     fn selects<T: Model>(&self) -> String {
+        let primary_field_reference = self.primary_field_reference::<T>();
         match &self {
             OrderBy::IdAsc | OrderBy::IdDesc => {
                 format!(
-                    "{} AS _order_by_primary",
-                    self.primary_field_reference::<T>()
+                    "{}::text AS _cursor, {} AS _order_by_primary",
+                    primary_field_reference, primary_field_reference
                 )
             }
             OrderBy::SecondaryAsc(var) | OrderBy::SecondaryDesc(var) => {
                 if matches!(var, Var::Node(_)) {
                     format!(
-                        "MAX({}) AS _order_by_primary, {}.{} AS _order_by_secondary",
-                        self.primary_field_reference::<T>(),
+                        "MAX({})::text AS _cursor, MAX({}) AS _order_by_primary, {}.{} AS _order_by_secondary",
+                        primary_field_reference,
+                        primary_field_reference,
                         T::table_name(),
                         T::id_field_name()
                     )
                 } else {
                     format!(
-                        "{} AS _order_by_primary, {}.{} AS _order_by_secondary",
-                        self.primary_field_reference::<T>(),
+                        "{}::text AS _cursor, {} AS _order_by_primary, {}.{} AS _order_by_secondary",
+                        primary_field_reference,
+                        primary_field_reference,
                         T::table_name(),
                         T::id_field_name()
                     )
@@ -257,9 +260,8 @@ impl<T: Model> Select<T> {
 
         let id_field_name = T::id_field_name();
         let select_clause = format!(
-            "SELECT DISTINCT {}.*, {}::text AS _cursor, {} FROM {}",
+            "SELECT DISTINCT {}.*, {} FROM {}",
             self.select_path,
-            self.order_by.primary_field_reference::<T>(),
             self.order_by.selects::<T>(),
             table_name
         );
