@@ -113,6 +113,16 @@ impl OrderBy {
             _ => false,
         }
     }
+
+    fn references_relation(&self) -> bool {
+        if matches!(self, OrderBy::SecondaryAsc(Var::Node(_)))
+            || matches!(self, OrderBy::SecondaryDesc(Var::Node(_)))
+        {
+            true
+        } else {
+            false
+        }
+    }
 }
 
 impl<T: Model> Select<T> {
@@ -266,6 +276,8 @@ impl<T: Model> Select<T> {
             table_name
         );
 
+        let order_by_references_relation = self.order_by.references_relation();
+
         tracing::info!("select clause: {}", select_clause);
 
         let mut vars = vec![];
@@ -329,11 +341,14 @@ impl<T: Model> Select<T> {
                 let inverse_predicate = inverse_predicates.join(" AND ");
                 let inverse_where_clause = format!("WHERE {}", inverse_predicate);
 
-                let group_by_clause = if join_clause != "" {
-                    format!("GROUP BY {}.{}", table_name, id_field_name)
-                } else {
-                    "".into()
-                };
+                // let group_by_clause = if join_clause != "" {
+                //     format!("GROUP BY {}.{}", table_name, id_field_name)
+                // } else {
+                //     "".into()
+                // };
+
+                let group_by_clause =
+                    generate_group_by_clause::<T>(join_clause != "", order_by_references_relation);
 
                 tracing::info!("building order_by clause");
 
@@ -422,11 +437,14 @@ impl<T: Model> Select<T> {
                 let predicate = predicates.join(" AND ");
                 let where_clause = format!("WHERE {}", predicate);
 
-                let group_by_clause = if join_clause != "" {
-                    format!("GROUP BY {}.{}", table_name, id_field_name)
-                } else {
-                    "".into()
-                };
+                // let group_by_clause = if join_clause != "" {
+                //     format!("GROUP BY {}.{}", table_name, id_field_name)
+                // } else {
+                //     "".into()
+                // };
+
+                let group_by_clause =
+                    generate_group_by_clause::<T>(join_clause != "", order_by_references_relation);
 
                 tracing::info!("building order_by clause");
 
@@ -669,4 +687,29 @@ fn joins_from_var(
             Ok(res)
         }
     }
+}
+
+fn generate_group_by_clause<T: Model>(
+    references_relation: bool,
+    order_by_references_relation: bool,
+) -> String {
+    let table_name = T::table_name();
+    let id_field_name = T::id_field_name();
+
+    if !references_relation {
+        return "".into();
+    }
+
+    if !order_by_references_relation {
+        return format!("GROUP BY {}.{}", table_name, id_field_name);
+    }
+
+    // generate a list of each field
+    let fields_string = T::field_definitions()
+        .into_iter()
+        .map(|field_def| format!("{}.{}", table_name, field_def.name))
+        .collect::<Vec<_>>()
+        .join(", ");
+
+    format!("GROUP BY {}", fields_string)
 }
