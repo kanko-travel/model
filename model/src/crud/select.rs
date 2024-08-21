@@ -58,13 +58,22 @@ impl OrderBy {
                     self.primary_field_reference::<T>()
                 )
             }
-            OrderBy::SecondaryAsc(_) | OrderBy::SecondaryDesc(_) => {
-                format!(
-                    "{} AS _order_by_primary, {}.{} AS _order_by_secondary",
-                    self.primary_field_reference::<T>(),
-                    T::table_name(),
-                    T::id_field_name()
-                )
+            OrderBy::SecondaryAsc(var) | OrderBy::SecondaryDesc(var) => {
+                if matches!(var, Var::Node(_)) {
+                    format!(
+                        "MAX({}) AS _order_by_primary, {}.{} AS _order_by_secondary",
+                        self.primary_field_reference::<T>(),
+                        T::table_name(),
+                        T::id_field_name()
+                    )
+                } else {
+                    format!(
+                        "{} AS _order_by_primary, {}.{} AS _order_by_secondary",
+                        self.primary_field_reference::<T>(),
+                        T::table_name(),
+                        T::id_field_name()
+                    )
+                }
             }
         }
     }
