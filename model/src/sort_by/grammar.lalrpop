@@ -11,7 +11,7 @@ grammar(model_def: &ModelDef);
 
 pub Expr: Var = {
 	<var:Var> =>? {
-        var.resolve_definition(model_def).map_err(|_| ParseError::User {
+        var.resolve_definition(model_def).map_err(|err| ParseError::User {
 			error: "undefined field"
 		})?;
 

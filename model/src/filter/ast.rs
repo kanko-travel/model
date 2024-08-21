@@ -35,9 +35,17 @@ impl Var {
         match self {
             Var::Leaf(name) => {
                 let FieldDefinitionMap(field_defs) = (model_def.field_definitions)().into();
-                let def = field_defs
-                    .get(name)
-                    .ok_or_else(|| Error::bad_request("undefined field"))?;
+                let def = field_defs.get(name).ok_or_else(|| {
+                    let msg = format!(
+                        "undefined field: {} on model with table_name: {}",
+                        name,
+                        (model_def.table_name)()
+                    );
+
+                    println!("{}", msg);
+
+                    Error::bad_request(msg.as_str())
+                })?;
 
                 Ok(def.clone())
             }
@@ -46,7 +54,13 @@ impl Var {
                 let relation_def = relation_defs
                     .iter()
                     .find(|def| &def.name == name)
-                    .ok_or_else(|| Error::bad_request("undefined field"))?;
+                    .ok_or_else(|| {
+                        let msg = format!("undefined relation: {}", name);
+
+                        println!("{}", msg);
+
+                        Error::bad_request(msg.as_str())
+                    })?;
 
                 let model_def = &relation_def.model_definition;
 

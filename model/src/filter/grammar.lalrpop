@@ -26,7 +26,7 @@ Val: Option<String> = {
 Comp: Box<Expr> = {
 	<var:Var> <op:CompOp> <val:Val> =>? {
 		let def = var.resolve_definition(model_def).map_err(|_| ParseError::User {
-			error: "undefined field"
+			error: "undefined field",
 		})?;
 
 		let val: FieldValue = if let Some(val) = val {
