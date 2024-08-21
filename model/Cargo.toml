@@ -21,6 +21,7 @@ lalrpop-util.workspace = true
 model_wrapper.workspace = true
 model_derive.workspace = true
 enum_derive.workspace = true
+tracing.workspace = true
 
 [dev-dependencies]
 tokio.workspace = true

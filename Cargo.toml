@@ -25,6 +25,7 @@ sqlx = { version = "0.7", features = [
 lalrpop = "0.20"
 lalrpop-util = { version = "0.20", features = ["lexer", "unicode"] }
 tokio = { version = "1.2", features = ["full"] }
+tracing = "0.1.37"
 
 model_derive = { path = "model_derive" }
 model_wrapper = { path = "model_wrapper" }
