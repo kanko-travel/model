@@ -42,7 +42,7 @@ impl Var {
                         (model_def.table_name)()
                     );
 
-                    println!("{}", msg);
+                    tracing::error!("{}", msg);
 
                     Error::bad_request(msg.as_str())
                 })?;
@@ -57,7 +57,7 @@ impl Var {
                     .ok_or_else(|| {
                         let msg = format!("undefined relation: {}", name);
 
-                        println!("{}", msg);
+                        tracing::error!("{}", msg);
 
                         Error::bad_request(msg.as_str())
                     })?;

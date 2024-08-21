@@ -77,17 +77,20 @@ impl<'de, T: Model> Deserialize<'de> for Query<T> {
         let raw_query = RawQuery::deserialize(deserializer)?;
 
         // debugging
-        println!("{:?}", raw_query);
+        tracing::info!("raw_query: {:?}", raw_query);
 
         let query: Query<T> = raw_query.try_into().map_err(serde::de::Error::custom)?;
 
-        // debugging
-        println!("successfully parsed query");
+        tracing::info!("successfully parsed query");
+
+        tracing::info!("query filter: {:?}", query.filter);
+
         let sql = query.filter.as_ref().map(|f| {
             let (sql, _, _) = f.to_sql::<T>(0);
             sql
         });
-        println!("filter: {:?}", sql);
+
+        tracing::info!("filter sql: {:?}", sql);
 
         Ok(query)
     }
