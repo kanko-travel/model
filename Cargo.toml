@@ -13,7 +13,7 @@ uuid = { version = "1.7", features = ["v4", "serde"] }
 chrono = { version = "0.4", features = ["serde"] }
 rust_decimal = { version = "1.34", features = ["serde-with-float"] }
 base64 = "0.21"
-sqlx = { version = "0.7", features = [
+sqlx = { version = "0.8", features = [
     "postgres",
     "uuid",
     "chrono",
