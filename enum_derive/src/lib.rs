@@ -76,7 +76,8 @@ pub fn enum_derive(input: TokenStream) -> TokenStream {
 
         impl<'r> model::sqlx::Decode<'r, model::sqlx::Postgres> for #name {
             fn decode(
-                value: <model::sqlx::Postgres as model::sqlx::database::HasValueRef<'r>>::ValueRef,
+                // value: <model::sqlx::Postgres as model::sqlx::database::HasValueRef<'r>>::ValueRef,
+                value: model::sqlx::postgres::PgValueRef<'r>,
             ) -> Result<Self, model::sqlx::error::BoxDynError> {
                 let variant_string = <String as model::sqlx::Decode<model::sqlx::Postgres>>::decode(value)?;
 
