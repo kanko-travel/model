@@ -9,6 +9,7 @@ use crate::{crud::util::build_query, Model};
 #[derive(Clone, Debug)]
 pub struct Delete<'a, T: Model> {
     id: &'a Uuid,
+    idempotent: bool,
     _marker: PhantomData<T>,
 }
 
@@ -19,8 +20,14 @@ where
     pub(crate) fn new(id: &'a Uuid) -> Self {
         Self {
             id,
+            idempotent: false,
             _marker: PhantomData::default(),
         }
+    }
+
+    pub fn idempotent(mut self) -> Self {
+        self.idempotent = true;
+        self
     }
 
     pub async fn execute(&self, executor: &mut PgConnection) -> Result<(), Error> {
@@ -31,9 +38,15 @@ where
 
         let var_bindings = vec![self.id.clone().into()];
 
-        build_query(&statement, var_bindings)
+        let result = build_query(&statement, var_bindings)
             .execute(executor)
-            .await?;
+            .await;
+
+        if self.idempotent && matches!(result, Err(sqlx::Error::RowNotFound)) {
+            return Ok(());
+        }
+
+        result?;
 
         Ok(())
     }

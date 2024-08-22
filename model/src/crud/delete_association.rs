@@ -10,6 +10,7 @@ pub struct DeleteAssociation<'a, T: Model> {
     value: &'a T,
     relation_name: &'a str,
     associated_id: &'a Uuid,
+    idempotent: bool,
 }
 
 impl<'a, T> DeleteAssociation<'a, T>
@@ -21,7 +22,13 @@ where
             value,
             relation_name,
             associated_id,
+            idempotent: false,
         }
+    }
+
+    pub fn idempotent(mut self) -> Self {
+        self.idempotent = true;
+        self
     }
 
     pub async fn execute(&self, executor: &mut PgConnection) -> Result<(), Error> {
@@ -48,9 +55,15 @@ where
                     self.associated_id.clone().into(),
                 ];
 
-                build_query(&statement, var_bindings)
+                let result = build_query(&statement, var_bindings)
                     .execute(executor)
-                    .await?;
+                    .await;
+
+                if self.idempotent && matches!(result, Err(sqlx::Error::RowNotFound)) {
+                    return Ok(());
+                }
+
+                result?;
 
                 Ok(())
             }
