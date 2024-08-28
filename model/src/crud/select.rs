@@ -18,7 +18,7 @@ const DEFAULT_LIMIT: i64 = 100;
 pub struct WithCursor<T> {
     #[sqlx(flatten)]
     node: T,
-    _cursor: String,
+    _cursor: Option<String>,
 }
 
 #[derive(Clone, Debug)]
@@ -598,9 +598,16 @@ fn build_cursor<T: Model>(node: &WithCursor<T>, order_by: &OrderBy) -> Result<Cu
             let model_def = T::definition();
             let def = var.resolve_definition(&model_def)?;
 
+            let value = node
+                ._cursor
+                .as_ref()
+                .map(|cursor| def.type_.parse_value(cursor))
+                .transpose()?
+                .or_else(|| def.type_.null_value().into());
+
             Cursor {
                 id: node.node.id_field_value(),
-                value: def.type_.parse_value(&node._cursor)?.into(),
+                value,
             }
         }
         .into(),
