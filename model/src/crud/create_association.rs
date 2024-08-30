@@ -10,6 +10,7 @@ pub struct CreateAssociation<'a, T: Model> {
     value: &'a T,
     relation_name: &'a str,
     associated_id: &'a Uuid,
+    idempotent: bool,
 }
 
 impl<'a, T> CreateAssociation<'a, T>
@@ -21,7 +22,13 @@ where
             value,
             relation_name,
             associated_id,
+            idempotent: false,
         }
+    }
+
+    pub fn idempotent(mut self) -> Self {
+        self.idempotent = true;
+        self
     }
 
     pub async fn execute(&self, executor: &mut PgConnection) -> Result<(), Error> {
@@ -38,10 +45,17 @@ where
 
         match relation.reference {
             Reference::Via((junction_table, from_ref, to_ref)) => {
-                let statement = format!(
-                    "INSERT INTO {} ({}, {}) VALUES ($1, $2)",
-                    junction_table, from_ref, to_ref
-                );
+                let statement = if self.idempotent {
+                    format!(
+                        "INSERT INTO {} ({}, {}) VALUES ($1, $2) ON CONFLICT ON CONSTRAINT {}_pkey DO NOTHING",
+                        junction_table, from_ref, to_ref, junction_table
+                    )
+                } else {
+                    format!(
+                        "INSERT INTO {} ({}, {}) VALUES ($1, $2)",
+                        junction_table, from_ref, to_ref
+                    )
+                };
 
                 let var_bindings: Vec<FieldValue> = vec![
                     self.value.id_field_value().into(),
