@@ -701,14 +701,24 @@ fn generate_group_by_clause<T: Model>(
     order_by_references_relation: bool,
 ) -> String {
     let table_name = T::table_name();
-    let id_field_name = T::id_field_name();
 
     if !references_relation {
         return "".into();
     }
 
     if !order_by_references_relation {
-        return format!("GROUP BY {}.{}", table_name, id_field_name);
+        // generate a list of each primary_key field
+        let fields_string = T::field_definitions()
+            .into_iter()
+            .filter_map(|field_def| {
+                field_def
+                    .primary_key
+                    .then(|| format!("{}.{}", table_name, field_def.name))
+            })
+            .collect::<Vec<_>>()
+            .join(", ");
+
+        return format!("GROUP BY {}", fields_string);
     }
 
     // generate a list of each field
