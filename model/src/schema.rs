@@ -164,11 +164,7 @@ fn create_table<T: Model>() -> DDLEntity {
             }
 
             if def.unique {
-                if def.nullable {
-                    col = format!("{} {}", col, "UNIQUE NULLS NOT DISTINCT");
-                } else {
-                    col = format!("{} {}", col, "UNIQUE");
-                }
+                col = format!("{} {}", col, "UNIQUE");
             }
 
             col
