@@ -23,7 +23,6 @@ struct Bakery {
 struct Cake {
   #[model(id)]
   id: Uuid,
-  #[model(unique)]
   bakery_id: Uuid,
   #[model(enum, primary_key)]
   cake_type: CakeType
