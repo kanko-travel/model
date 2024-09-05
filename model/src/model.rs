@@ -24,36 +24,36 @@ pub trait Model: Related {
         }
     }
 
-    fn belongs_to<R>(name: String, column: String) -> RelationDef
+    fn belongs_to<R>(name: &str, column: &str) -> RelationDef
     where
         Self: Sized,
         R: Model,
     {
-        RelationDef::belongs_to::<Self, R>(name, column)
+        RelationDef::belongs_to::<Self, R>(name.into(), column.into())
     }
 
-    fn has_one<R>(name: String, column: String) -> RelationDef
+    fn has_one<R>(name: &str, column: &str) -> RelationDef
     where
         Self: Sized,
         R: Model,
     {
-        RelationDef::has_one::<Self, R>(name, column)
+        RelationDef::has_one::<Self, R>(name.into(), column.into())
     }
 
-    fn has_many<R>(name: String, column: String) -> RelationDef
+    fn has_many<R>(name: &str, column: &str) -> RelationDef
     where
         Self: Sized,
         R: Model,
     {
-        RelationDef::has_many::<Self, R>(name, column)
+        RelationDef::has_many::<Self, R>(name.into(), column.into())
     }
 
-    fn has_many_via<R>(name: String, junction_table_name: String) -> RelationDef
+    fn has_many_via<R>(name: &str, junction_table_name: &str) -> RelationDef
     where
         Self: Sized,
         R: Model,
     {
-        RelationDef::has_many_via::<Self, R>(name, junction_table_name)
+        RelationDef::has_many_via::<Self, R>(name.into(), junction_table_name.into())
     }
 
     fn id_field_value(&self) -> Uuid;
