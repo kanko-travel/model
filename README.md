@@ -108,7 +108,7 @@ another_bakery_with_same_primary_key
   .await
   .unwrap()
 
-assert_eq!(bakery.id, another_bakery_with_same_primary_key);
+assert_eq!(bakery.id, another_bakery_with_same_primary_key.id);
 
 let mut cake = Cake {
   id: Uuid::new_v4(),
