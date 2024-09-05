@@ -14,7 +14,7 @@ use model::{Model, Enum, Related, RelationDef};
 struct Bakery {
   #[model(id)]
   id: Uuid,
-  #[model(unique, primary_key)]
+  #[model(primary_key)]
   name: String
 }
 
