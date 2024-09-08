@@ -21,8 +21,28 @@ pub fn model_derive(input: TokenStream) -> TokenStream {
 
     let mut input_derives = Vec::new();
 
+    // Filter out these derives (e.g., Debug, Clone)
+    let exclude_input_derives = vec!["Model", "model::Model"];
+
     // Iterate over the attributes to find `model` and then `table_name`
     for attr in input.attrs {
+        if attr.path.is_ident("derive") {
+            if let Ok(meta) = attr.parse_meta() {
+                if let Meta::List(meta_list) = meta {
+                    for nested in meta_list.nested.iter() {
+                        if let NestedMeta::Meta(Meta::Path(path)) = nested {
+                            // should_include_derive(&path, &exclude_derives)
+                            if let Some(ident) = path.get_ident() {
+                                if !exclude_input_derives.contains(&ident.to_string().as_str()) {
+                                    input_derives.push(path.clone());
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         if let Ok(Meta::List(meta)) = attr.parse_meta() {
             if meta.path.is_ident("model") {
                 for nested_meta in meta.nested {
@@ -37,15 +57,6 @@ pub fn model_derive(input: TokenStream) -> TokenStream {
                         })) => {
                             if path.is_ident("table_name") {
                                 table_name = lit_str.into();
-                            }
-                        }
-                        NestedMeta::Meta(Meta::List(meta_list)) => {
-                            if meta_list.path.is_ident("input_derives") {
-                                for nested in meta_list.nested {
-                                    if let NestedMeta::Meta(Meta::Path(path)) = nested {
-                                        input_derives.push(path);
-                                    }
-                                }
                             }
                         }
                         _ => panic!("Invalid attribute"),

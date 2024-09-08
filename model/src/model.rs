@@ -207,13 +207,13 @@ mod tests {
 
     #[test]
     fn test_model_with_enum() {
-        #[derive(Clone, Serialize, Deserialize, Enum)]
+        #[derive(Clone, Debug, Serialize, Deserialize, Enum)]
         enum TestEnum {
             On,
             Off,
         }
 
-        #[derive(Serialize, Deserialize, FromRow, Model)]
+        #[derive(Clone, Debug, Serialize, Deserialize, FromRow, Model)]
         #[model(table_name = "test_model")]
         struct TestModel {
             #[model(primary_key, id)]
