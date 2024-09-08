@@ -46,7 +46,7 @@ where
         DeleteAssociation::new(self, relation_name, associated_id)
     }
 
-    fn create<'a>(&'a self) -> Create<'a, Self> {
+    fn create<'a>(&'a mut self) -> Create<'a, Self> {
         Create::new(self)
     }
 

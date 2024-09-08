@@ -3,20 +3,26 @@ use sqlx::{postgres::PgRow, FromRow, PgConnection};
 use crate::Error;
 use crate::{crud::util::build_query, FieldValue, Model};
 
-#[derive(Clone, Debug)]
+use super::util::build_query_as;
+
+#[derive(Debug)]
 pub struct Create<'a, T: Model> {
-    value: &'a T,
+    value: &'a mut T,
+    idempotent: bool,
 }
 
 impl<'a, T> Create<'a, T>
 where
     T: Model + for<'b> FromRow<'b, PgRow> + Unpin + Sized + Send,
 {
-    pub(crate) fn new(value: &'a T) -> Self {
-        Self { value }
+    pub(crate) fn new(value: &'a mut T) -> Self {
+        Self {
+            value,
+            idempotent: false,
+        }
     }
 
-    pub async fn execute(&self, executor: &mut PgConnection) -> Result<(), Error> {
+    pub async fn execute(&mut self, executor: &mut PgConnection) -> Result<(), Error> {
         let table_name = T::table_name();
         let fields = self.value.fields()?;
 
@@ -33,12 +39,29 @@ where
             .collect::<Vec<String>>()
             .join(", ");
 
+        let var_bindings: Vec<FieldValue> = fields.into_iter().map(|(_, value)| value).collect();
+
+        if self.idempotent {
+            let primary_key_index = format!("{}_pkey", table_name);
+
+            let statement = format!(
+                "INSERT INTO {} ({}) VALUES ({}) ON CONFLICT ON CONSTRAINT {} DO NOTHING RETURNING *",
+                table_name, columns, placeholder_values, primary_key_index
+            );
+
+            let created: T = build_query_as(&statement, var_bindings)
+                .fetch_one(executor)
+                .await?;
+
+            *self.value = created;
+
+            return Ok(());
+        }
+
         let statement = format!(
             "INSERT INTO {} ({}) VALUES ({})",
             table_name, columns, placeholder_values
         );
-
-        let var_bindings: Vec<FieldValue> = fields.into_iter().map(|(_, value)| value).collect();
 
         build_query(&statement, var_bindings)
             .execute(executor)
