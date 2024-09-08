@@ -54,7 +54,7 @@ async fn test_create() {
 
     let mut records = records.into_iter();
 
-    let record = records.next().unwrap();
+    let mut record = records.next().unwrap();
 
     record.create().execute(&mut tx).await.unwrap();
 
@@ -83,7 +83,7 @@ async fn test_upsert() {
 
     let mut records = records.into_iter();
 
-    let record = records.next().unwrap();
+    let mut record = records.next().unwrap();
 
     record.create().execute(&mut tx).await.unwrap();
 
