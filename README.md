@@ -88,7 +88,7 @@ let bakery = Bakery {
 };
 
 
-bakery
+let bakery = bakery
   .create()
   .execute(&mut conn)
   .await
@@ -101,7 +101,7 @@ let mut another_bakery_with_same_primary_key = Bakery {
 
 assert_neq!(bakery.id, another_bakery_with_same_primary_key.id);
 
-another_bakery_with_same_primary_key
+let another_bakery_with_same_primary_key = another_bakery_with_same_primary_key
   .upsert()
   .execute(&mut conn)
   .await
@@ -109,15 +109,14 @@ another_bakery_with_same_primary_key
 
 assert_eq!(bakery.id, another_bakery_with_same_primary_key.id);
 
-let mut cake = Cake {
+let cake = Cake {
   id: Uuid::new_v4(),
   bakery_id: bakery.id.clone(),
   cake_type: CakeType::ButterCake,
   name: "Southern Coconut Cake".into(),
-};
+}
 
-cake
-  .create()
+let mut cake = cake.create()
   .execute(&mut conn)
   .await
   .unwrap()
@@ -134,7 +133,7 @@ let topping = Topping {
   name: "Coconut Flakes"
 }
 
-topping
+let topping = topping
   .create()
   .execute(&mut conn)
   .await
