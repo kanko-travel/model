@@ -35,7 +35,7 @@ async fn insert_records(tx: &mut Transaction<'_, Postgres>) {
     let records = read_records();
 
     for record in records.into_iter() {
-        record.upsert().execute(tx).await.unwrap();
+        record.create().execute(tx).await.unwrap();
     }
 }
 
