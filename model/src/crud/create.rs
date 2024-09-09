@@ -1,7 +1,7 @@
 use sqlx::{postgres::PgRow, FromRow, PgConnection};
 
+use crate::Error;
 use crate::{crud::util::build_query, FieldValue, Model};
-use crate::{Error, Input};
 
 use super::util::build_query_as;
 
@@ -13,11 +13,11 @@ pub struct Create<T> {
 
 impl<T> Create<T>
 where
-    T: Model + Input + for<'b> FromRow<'b, PgRow> + Unpin + Sized + Send,
+    T: Model + for<'b> FromRow<'b, PgRow> + Unpin + Sized + Send,
 {
-    pub(crate) fn new(input: T::InputType) -> Self {
+    pub(crate) fn new(value: T) -> Self {
         Self {
-            value: T::from_input(input),
+            value,
             idempotent: false,
         }
     }
