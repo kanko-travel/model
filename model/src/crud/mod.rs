@@ -14,7 +14,7 @@ use sqlx::{Database, FromRow, Postgres};
 use upsert::Upsert;
 use uuid::Uuid;
 
-use crate::{Error, Input};
+use crate::Error;
 use crate::{Model, Query};
 
 use self::{create::Create, delete::Delete, select::Select, update::Update};
@@ -24,7 +24,6 @@ pub trait Crud
 where
     Self: Clone
         + Model
-        + Input
         + for<'a> FromRow<'a, <Postgres as Database>::Row>
         + Unpin
         + Sized
@@ -39,8 +38,8 @@ where
         query.try_into()
     }
 
-    fn create(input: Self::InputType) -> Create<Self> {
-        Create::new(input)
+    fn create(self) -> Create<Self> {
+        Create::new(self)
     }
 
     fn upsert(self) -> Upsert<Self> {
@@ -75,7 +74,6 @@ where
 impl<T> Crud for T where
     T: Clone
         + Model
-        + Input
         + for<'a> FromRow<'a, <Postgres as Database>::Row>
         + Unpin
         + Sized

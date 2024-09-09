@@ -19,30 +19,8 @@ pub fn model_derive(input: TokenStream) -> TokenStream {
     // Initialize the table name to a default or error message in case attribute is not found
     let mut table_name = None;
 
-    let mut input_derives = Vec::new();
-
-    // Filter out these derives (e.g., Debug, Clone)
-    let exclude_input_derives = vec!["Model", "model::Model", "FromRow", "sqlx::prelude::FromRow"];
-
     // Iterate over the attributes to find `model` and then `table_name`
     for attr in input.attrs {
-        if attr.path.is_ident("derive") {
-            if let Ok(meta) = attr.parse_meta() {
-                if let Meta::List(meta_list) = meta {
-                    for nested in meta_list.nested.iter() {
-                        if let NestedMeta::Meta(Meta::Path(path)) = nested {
-                            // should_include_derive(&path, &exclude_derives)
-                            if let Some(ident) = path.get_ident() {
-                                if !exclude_input_derives.contains(&ident.to_string().as_str()) {
-                                    input_derives.push(path.clone());
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
         if let Ok(Meta::List(meta)) = attr.parse_meta() {
             if meta.path.is_ident("model") {
                 for nested_meta in meta.nested {
@@ -72,45 +50,6 @@ pub fn model_derive(input: TokenStream) -> TokenStream {
             _ => panic!("Model only supports named fields"),
         },
         _ => panic!("Model can only be derived for structs"),
-    };
-
-    let input_visibility = &input.vis;
-    let input_ident = syn::Ident::new(&format!("{}Input", &ident), ident.span());
-    let input_generics = &input.generics;
-
-    let input_fields = fields
-        .clone()
-        .into_iter()
-        .filter(|f| {
-            let (id, _, _, _, _, _, _) = parse_attributes(&f.attrs);
-
-            !id
-        })
-        .map(|mut field| {
-            field.attrs.retain(|attr| match attr.parse_meta() {
-                Ok(Meta::List(meta_list)) => {
-                    !(meta_list.path.is_ident("model") || meta_list.path.is_ident("sqlx"))
-                }
-                _ => true,
-            });
-
-            field
-        })
-        .collect::<Vec<_>>();
-
-    let input_derives = if input_derives.is_empty() {
-        quote! {}
-    } else {
-        quote! {
-            #[derive(#(#input_derives),*)]
-        }
-    };
-
-    let input_type_definition = quote! {
-        #input_derives
-        #input_visibility struct #input_ident #input_generics {
-            #(#input_fields),*
-        }
     };
 
     let table_name = table_name.expect("Specify #[model(table_name = \"...\")] attribute");
@@ -215,51 +154,6 @@ pub fn model_derive(input: TokenStream) -> TokenStream {
         })
         .unzip();
 
-    let input_struct_assignments: Vec<_> = input_fields
-        .iter()
-        .map(|field| {
-            let field_ident = field.ident.as_ref().expect("fields must be named");
-
-            quote! {
-                #field_ident: input.#field_ident
-            }
-        })
-        .collect();
-
-    let input_assignments: Vec<_> = input_fields
-        .iter()
-        .filter(|field| {
-            let (_, _, _, immutable, _, _, _) = parse_attributes(&field.attrs);
-            !immutable
-        })
-        .map(|field| {
-            let field_ident = field.ident.as_ref().expect("fields must be named");
-
-            quote! {
-                self.#field_ident = input.#field_ident;
-            }
-        })
-        .collect();
-
-    let input_impl = quote! {
-        impl #impl_generics model::Input for #ident #type_generics #where_clause {
-            type InputType = #input_ident;
-
-            fn from_input(input: Self::InputType) -> Self {
-                Self {
-                    #id_field: uuid::Uuid::new_v4(),
-                    #(#input_struct_assignments),*
-                }
-            }
-
-            fn merge_input(mut self, input: Self::InputType) -> Self {
-                #(#input_assignments)*
-
-                self
-            }
-        }
-    };
-
     let model_impl = quote! {
         impl #impl_generics model::Model for #ident #type_generics #where_clause {
             fn table_name() -> String {
@@ -296,10 +190,6 @@ pub fn model_derive(input: TokenStream) -> TokenStream {
     };
 
     let out = quote! {
-        #input_type_definition
-
-        #input_impl
-
         #model_impl
 
         #related_impl
