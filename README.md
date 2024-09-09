@@ -1,9 +1,11 @@
 # Model
+
 A simple ORM for use with sqlx and postgres
 
 [![Build status](https://badge.buildkite.com/a26e0920c7b5f082d47fd89e2b48860f18b7a7afec64acbad7.svg)](https://buildkite.com/kanko-travel/kanko-model-crate)
 
 ## Example Usage
+
 ### The Bakery Object Model
 
 ```rust
@@ -46,6 +48,7 @@ struct Topping {
 ```
 
 ### Defining Relations for the Bakery Object Model
+
 ```rust
 // ...continued from above
 
@@ -76,6 +79,7 @@ impl Related for Topping {
 ```
 
 ### Performing CRUD Operations on the Bakery Object Model
+
 ```rust
 // ...continued from above
 
@@ -105,7 +109,7 @@ another_bakery_with_same_primary_key
   .upsert()
   .execute(&mut conn)
   .await
-  .unwrap()
+  .unwrap();
 
 assert_eq!(bakery.id, another_bakery_with_same_primary_key.id);
 
@@ -120,7 +124,7 @@ cake
   .create()
   .execute(&mut conn)
   .await
-  .unwrap()
+  .unwrap();
 
 cake.name = "Western Coconut Cake".into();
 
@@ -144,7 +148,7 @@ cake
   .create_association("toppings", topping.id.clone())
   .execute(&mut conn)
   .await
-  .unwrap()
+  .unwrap();
 
 let butter_cakes_with_coconut_flakes = Cake::select()
   .filter(

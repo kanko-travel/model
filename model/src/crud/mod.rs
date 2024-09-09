@@ -38,11 +38,11 @@ where
         query.try_into()
     }
 
-    fn create(self) -> Create<Self> {
+    fn create<'a>(&'a self) -> Create<'a, Self> {
         Create::new(self)
     }
 
-    fn upsert(self) -> Upsert<Self> {
+    fn upsert<'a>(&'a mut self) -> Upsert<'a, Self> {
         Upsert::new(self)
     }
 
@@ -50,8 +50,12 @@ where
         Update::new(self)
     }
 
-    fn delete<'a>(id: &'a Uuid) -> Delete<'a, Self> {
-        Delete::new(id)
+    fn delete<'a>(&'a self) -> Delete<Self> {
+        Delete::new(self.id_field_value())
+    }
+
+    fn delete_by_id<Id: Into<Uuid>>(id: Id) -> Delete<Self> {
+        Delete::new(id.into())
     }
 
     fn create_association<'a>(
