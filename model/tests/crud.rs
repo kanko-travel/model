@@ -50,13 +50,12 @@ async fn test_create() {
 
     setup_tables(&mut tx).await;
 
-    let records = read_records();
+    let input = DummyInput {
+        age: 24.into(),
+        name: "John Doe".to_string().into(),
+    };
 
-    let mut records = records.into_iter();
-
-    let mut record = records.next().unwrap();
-
-    record.create().execute(&mut tx).await.unwrap();
+    let record = Dummy::create(input).execute(&mut tx).await.unwrap();
 
     let inserted = Dummy::select()
         .by_id(record.id.clone())
@@ -83,14 +82,14 @@ async fn test_upsert() {
 
     let mut records = records.into_iter();
 
-    let mut record = records.next().unwrap();
+    let record = records.next().unwrap();
 
-    record.create().execute(&mut tx).await.unwrap();
+    let record = record.upsert().execute(&mut tx).await.unwrap();
 
     let mut upserted = record.clone();
     upserted.id = Uuid::new_v4();
 
-    upserted.upsert().execute(&mut tx).await.unwrap();
+    let upserted = upserted.upsert().execute(&mut tx).await.unwrap();
 
     assert_eq!(upserted.id, record.id);
     assert_eq!(upserted.name, record.name);

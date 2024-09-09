@@ -14,21 +14,41 @@ pub fn model_derive(input: TokenStream) -> TokenStream {
 
     let (impl_generics, type_generics, where_clause) = input.generics.split_for_impl();
 
+    let mut has_relations = false;
+
     // Initialize the table name to a default or error message in case attribute is not found
     let mut table_name = None;
 
-    let mut related_derive = quote! {
-        impl #impl_generics model::Related for #ident #type_generics #where_clause {}
-    };
+    let mut input_derives = Vec::new();
+
+    // Filter out these derives (e.g., Debug, Clone)
+    let exclude_input_derives = vec!["Model", "model::Model"];
 
     // Iterate over the attributes to find `model` and then `table_name`
     for attr in input.attrs {
+        if attr.path.is_ident("derive") {
+            if let Ok(meta) = attr.parse_meta() {
+                if let Meta::List(meta_list) = meta {
+                    for nested in meta_list.nested.iter() {
+                        if let NestedMeta::Meta(Meta::Path(path)) = nested {
+                            // should_include_derive(&path, &exclude_derives)
+                            if let Some(ident) = path.get_ident() {
+                                if !exclude_input_derives.contains(&ident.to_string().as_str()) {
+                                    input_derives.push(path.clone());
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         if let Ok(Meta::List(meta)) = attr.parse_meta() {
             if meta.path.is_ident("model") {
                 for nested_meta in meta.nested {
                     match nested_meta {
                         NestedMeta::Meta(Meta::Path(path)) if path.is_ident("has_relations") => {
-                            related_derive = quote! {};
+                            has_relations = true;
                         }
                         NestedMeta::Meta(Meta::NameValue(MetaNameValue {
                             path,
@@ -46,15 +66,52 @@ pub fn model_derive(input: TokenStream) -> TokenStream {
         }
     }
 
-    let table_name = table_name.expect("Specify #[model(table_name = \"...\")] attribute");
-
     let fields = match input.data {
         Data::Struct(data) => match data.fields {
             Fields::Named(fields) => fields.named,
-            _ => panic!("Queryable only supports named fields"),
+            _ => panic!("Model only supports named fields"),
         },
-        _ => panic!("Queryable can only be derived for structs"),
+        _ => panic!("Model can only be derived for structs"),
     };
+
+    let input_visibility = &input.vis;
+    let input_ident = syn::Ident::new(&format!("{}Input", &ident), ident.span());
+    let input_generics = &input.generics;
+
+    let input_fields = fields
+        .clone()
+        .into_iter()
+        .filter(|f| {
+            let (id, _, _, _, _, _, _) = parse_attributes(&f.attrs);
+
+            !id
+        })
+        .map(|mut field| {
+            field.attrs.retain(|attr| match attr.parse_meta() {
+                Ok(Meta::List(meta_list)) => !meta_list.path.is_ident("model"),
+                _ => true,
+            });
+
+            field
+        })
+        .collect::<Vec<_>>();
+
+    let input_derives = if input_derives.is_empty() {
+        quote! {}
+    } else {
+        quote! {
+            #[derive(#(#input_derives),*)]
+        }
+    };
+
+    let input_type_definition = quote! {
+        #input_derives
+        #input_visibility struct #input_ident #input_generics {
+            #(#input_fields),*
+        }
+    };
+
+    let table_name = table_name.expect("Specify #[model(table_name = \"...\")] attribute");
 
     // find the id field
     let mut field_attributes = fields.iter().map(|f| (f, parse_attributes(&f.attrs)));
@@ -156,7 +213,52 @@ pub fn model_derive(input: TokenStream) -> TokenStream {
         })
         .unzip();
 
-    let gen = quote! {
+    let input_struct_assignments: Vec<_> = input_fields
+        .iter()
+        .map(|field| {
+            let field_ident = field.ident.as_ref().expect("fields must be named");
+
+            quote! {
+                #field_ident: input.#field_ident
+            }
+        })
+        .collect();
+
+    let input_assignments: Vec<_> = input_fields
+        .iter()
+        .filter(|field| {
+            let (_, _, _, immutable, _, _, _) = parse_attributes(&field.attrs);
+            !immutable
+        })
+        .map(|field| {
+            let field_ident = field.ident.as_ref().expect("fields must be named");
+
+            quote! {
+                self.#field_ident = input.#field_ident;
+            }
+        })
+        .collect();
+
+    let input_impl = quote! {
+        impl #impl_generics model::Input for #ident #type_generics #where_clause {
+            type InputType = #input_ident;
+
+            fn from_input(input: Self::InputType) -> Self {
+                Self {
+                    #id_field: uuid::Uuid::new_v4(),
+                    #(#input_struct_assignments),*
+                }
+            }
+
+            fn merge_input(mut self, input: Self::InputType) -> Self {
+                #(#input_assignments)*
+
+                self
+            }
+        }
+    };
+
+    let model_impl = quote! {
         impl #impl_generics model::Model for #ident #type_generics #where_clause {
             fn table_name() -> String {
                 #table_name.into()
@@ -181,11 +283,27 @@ pub fn model_derive(input: TokenStream) -> TokenStream {
                 }
             }
         }
-
-        #related_derive
     };
 
-    gen.into()
+    let related_impl = if has_relations {
+        quote! {}
+    } else {
+        quote! {
+            impl #impl_generics model::Related for #ident #type_generics #where_clause {}
+        }
+    };
+
+    let out = quote! {
+        #input_type_definition
+
+        #input_impl
+
+        #model_impl
+
+        #related_impl
+    };
+
+    out.into()
 }
 
 fn flatten_option(mut nesting: usize) -> proc_macro2::TokenStream {
