@@ -171,7 +171,26 @@ impl<T> Select<T>
 where
     T: Model + for<'a> FromRow<'a, PgRow> + Unpin + Sized + Send,
 {
-    pub async fn fetch_page(&self, executor: &mut PgConnection) -> Result<Connection<T>, Error> {
+    pub async fn fetch_all(mut self, executor: &mut PgConnection) -> Result<Vec<T>, Error> {
+        self.limit = None;
+        self.cursor = None;
+
+        let filters = self.build_filters()?;
+        let (statement, var_bindings) = self.prepare(filters)?;
+
+        let nodes = build_query_as::<WithCursor<T>>(&statement, var_bindings)
+            .fetch_all(executor)
+            .await?;
+
+        Ok(nodes.into_iter().map(|node| node.node).collect())
+    }
+
+    pub async fn fetch_page(mut self, executor: &mut PgConnection) -> Result<Connection<T>, Error> {
+        self.limit = match self.limit {
+            Some(limit) if limit > 0 => limit.into(),
+            _ => DEFAULT_LIMIT.into(),
+        };
+
         let filters = self.build_filters()?;
         let (statement, var_bindings) = self.prepare(filters)?;
 
@@ -182,7 +201,7 @@ where
         self.paginate(nodes)
     }
 
-    pub async fn fetch_one(&self, executor: &mut PgConnection) -> Result<T, Error> {
+    pub async fn fetch_one(self, executor: &mut PgConnection) -> Result<T, Error> {
         let filters = self.build_filters()?;
         let (statement, var_bindings) = self.prepare(filters)?;
 
@@ -193,7 +212,7 @@ where
         Ok(result)
     }
 
-    pub async fn fetch_optional(&self, executor: &mut PgConnection) -> Result<Option<T>, Error> {
+    pub async fn fetch_optional(self, executor: &mut PgConnection) -> Result<Option<T>, Error> {
         let filters = self.build_filters()?;
         let (statement, var_bindings) = self.prepare(filters)?;
 
@@ -341,12 +360,6 @@ impl<T: Model> Select<T> {
                 let inverse_predicate = inverse_predicates.join(" AND ");
                 let inverse_where_clause = format!("WHERE {}", inverse_predicate);
 
-                // let group_by_clause = if join_clause != "" {
-                //     format!("GROUP BY {}.{}", table_name, id_field_name)
-                // } else {
-                //     "".into()
-                // };
-
                 let group_by_clause =
                     generate_group_by_clause::<T>(join_clause != "", order_by_references_relation);
 
@@ -364,14 +377,10 @@ impl<T: Model> Select<T> {
 
                 tracing::info!("inverse_order_by clause: {}", inverse_order_by_clause);
 
-                let limit = match self.limit {
-                    Some(limit) if limit > 0 => limit,
-                    _ => DEFAULT_LIMIT,
+                let limit_clause = match self.limit {
+                    Some(limit) if limit > 0 => format!("LIMIT {}", limit + 1),
+                    _ => "".into(),
                 };
-
-                let limit_clause = format!("LIMIT {}", limit + 1);
-
-                let inverse_limit_clause = format!("LIMIT {}", limit + 1);
 
                 let next_page_query = format!(
                     "
@@ -404,7 +413,7 @@ impl<T: Model> Select<T> {
                     inverse_where_clause,
                     group_by_clause,
                     inverse_order_by_clause,
-                    inverse_limit_clause
+                    limit_clause
                 );
 
                 format!(
@@ -437,12 +446,6 @@ impl<T: Model> Select<T> {
                 let predicate = predicates.join(" AND ");
                 let where_clause = format!("WHERE {}", predicate);
 
-                // let group_by_clause = if join_clause != "" {
-                //     format!("GROUP BY {}.{}", table_name, id_field_name)
-                // } else {
-                //     "".into()
-                // };
-
                 let group_by_clause =
                     generate_group_by_clause::<T>(join_clause != "", order_by_references_relation);
 
@@ -453,12 +456,10 @@ impl<T: Model> Select<T> {
 
                 tracing::info!("order_by clause: {}", order_by_clause);
 
-                let limit = match self.limit {
-                    Some(limit) if limit > 0 => limit,
-                    _ => DEFAULT_LIMIT,
+                let limit_clause = match self.limit {
+                    Some(limit) if limit > 0 => format!("LIMIT {}", limit + 1),
+                    _ => "".into(),
                 };
-
-                let limit_clause = format!("LIMIT {}", limit + 1);
 
                 format!(
                     "
