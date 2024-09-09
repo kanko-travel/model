@@ -1,28 +1,34 @@
 use sqlx::{postgres::PgRow, FromRow, PgConnection};
 
-use crate::Error;
 use crate::{crud::util::build_query, FieldValue, Model};
+use crate::{Error, Input};
 
 use super::util::build_query_as;
 
 #[derive(Debug)]
-pub struct Create<'a, T: Model> {
-    value: &'a mut T,
+pub struct Create<T> {
+    value: T,
     idempotent: bool,
 }
 
-impl<'a, T> Create<'a, T>
+impl<T> Create<T>
 where
-    T: Model + for<'b> FromRow<'b, PgRow> + Unpin + Sized + Send,
+    T: Model + Input + for<'b> FromRow<'b, PgRow> + Unpin + Sized + Send,
 {
-    pub(crate) fn new(value: &'a mut T) -> Self {
+    pub(crate) fn new(input: T::InputType) -> Self {
         Self {
-            value,
+            value: T::from_input(input),
             idempotent: false,
         }
     }
 
-    pub async fn execute(&mut self, executor: &mut PgConnection) -> Result<(), Error> {
+    pub fn idempotent(mut self) -> Self {
+        self.idempotent = true;
+
+        self
+    }
+
+    pub async fn execute(self, executor: &mut PgConnection) -> Result<T, Error> {
         let table_name = T::table_name();
         let fields = self.value.fields()?;
 
@@ -53,9 +59,7 @@ where
                 .fetch_one(executor)
                 .await?;
 
-            *self.value = created;
-
-            return Ok(());
+            return Ok(created);
         }
 
         let statement = format!(
@@ -67,6 +71,6 @@ where
             .execute(executor)
             .await?;
 
-        Ok(())
+        Ok(self.value)
     }
 }

@@ -6,19 +6,19 @@ use crate::{FieldValue, Model};
 use super::util::build_query_as;
 
 #[derive(Debug)]
-pub struct Upsert<'a, T: Model> {
-    value: &'a mut T,
+pub struct Upsert<T> {
+    value: T,
 }
 
-impl<'a, T> Upsert<'a, T>
+impl<T> Upsert<T>
 where
     T: Model + for<'b> FromRow<'b, PgRow> + Unpin + Sized + Send,
 {
-    pub(crate) fn new(value: &'a mut T) -> Self {
+    pub(crate) fn new(value: T) -> Self {
         Self { value }
     }
 
-    pub async fn execute(&mut self, executor: &mut PgConnection) -> Result<(), Error> {
+    pub async fn execute(self, executor: &mut PgConnection) -> Result<T, Error> {
         let table_name = T::table_name();
         let fields = self.value.fields()?;
 
@@ -62,8 +62,6 @@ where
             .fetch_one(executor)
             .await?;
 
-        *self.value = upserted;
-
-        Ok(())
+        Ok(upserted)
     }
 }
