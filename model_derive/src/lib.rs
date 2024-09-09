@@ -22,7 +22,7 @@ pub fn model_derive(input: TokenStream) -> TokenStream {
     let mut input_derives = Vec::new();
 
     // Filter out these derives (e.g., Debug, Clone)
-    let exclude_input_derives = vec!["Model", "model::Model"];
+    let exclude_input_derives = vec!["Model", "model::Model", "FromRow", "sqlx::prelude::FromRow"];
 
     // Iterate over the attributes to find `model` and then `table_name`
     for attr in input.attrs {
@@ -88,7 +88,9 @@ pub fn model_derive(input: TokenStream) -> TokenStream {
         })
         .map(|mut field| {
             field.attrs.retain(|attr| match attr.parse_meta() {
-                Ok(Meta::List(meta_list)) => !meta_list.path.is_ident("model"),
+                Ok(Meta::List(meta_list)) => {
+                    !(meta_list.path.is_ident("model") || meta_list.path.is_ident("sqlx"))
+                }
                 _ => true,
             });
 
