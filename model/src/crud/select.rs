@@ -444,7 +444,11 @@ impl<T: Model> Select<T> {
                 tracing::info!("join clause: {}", join_clause);
 
                 let predicate = predicates.join(" AND ");
-                let where_clause = format!("WHERE {}", predicate);
+                let where_clause = if predicate != "" {
+                    format!("WHERE {}", predicate)
+                } else {
+                    "".into()
+                };
 
                 let group_by_clause =
                     generate_group_by_clause::<T>(join_clause != "", order_by_references_relation);
