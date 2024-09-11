@@ -254,6 +254,8 @@ impl<T: Model> Select<T> {
             nodes
         };
 
+        tracing::warn!("PREV_CURSOR: {:?}", prev_cursor);
+
         match self.limit {
             Some(limit) if (page_nodes.len() as i64) > limit => {
                 let cursor_node = page_nodes.pop().ok_or_else(|| {
@@ -261,6 +263,8 @@ impl<T: Model> Select<T> {
                 })?;
 
                 let next_cursor = build_cursor(&cursor_node, &self.order_by)?;
+
+                tracing::warn!("NEXT_CURSOR: {:?}", next_cursor);
 
                 Ok(Connection {
                     nodes: page_nodes.into_iter().map(|n| n.node).collect(),
@@ -564,7 +568,7 @@ fn build_cursor_filter<T: Model>(
                 .group(
                     Filter::new()
                         .field(&secondary)
-                        .gte(secondary_value)
+                        .eq(secondary_value)
                         .and()
                         .field(id_field_name)
                         .gte(cursor.id),
@@ -581,7 +585,7 @@ fn build_cursor_filter<T: Model>(
                 .group(
                     Filter::new()
                         .field(&secondary)
-                        .lte(secondary_value)
+                        .eq(secondary_value)
                         .and()
                         .field(id_field_name)
                         .lte(cursor.id),
