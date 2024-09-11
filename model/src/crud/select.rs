@@ -635,7 +635,7 @@ fn split_nodes<T: Model>(
     for node in nodes.into_iter() {
         let c = build_cursor(&node, order_by)?;
 
-        if &c == cursor || node._next_page {
+        if node._next_page {
             next.push(node);
             continue;
         }
