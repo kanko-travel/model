@@ -19,6 +19,7 @@ pub struct WithCursor<T> {
     #[sqlx(flatten)]
     node: T,
     _cursor: Option<String>,
+    _next_page: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -104,13 +105,6 @@ impl OrderBy {
 
                 reference
             }
-        }
-    }
-
-    fn is_ascending(&self) -> bool {
-        match self {
-            OrderBy::IdAsc | OrderBy::SecondaryAsc(_) => true,
-            _ => false,
         }
     }
 
@@ -289,21 +283,17 @@ impl<T: Model> Select<T> {
     /// prepares a query statement that fetches a max size of limit * 2 + 1.
     /// includes limit + 1 rows after the provided cursor and limit rows before
     pub(crate) fn prepare(&self, exprs: Vec<Expr>) -> Result<(String, Vec<FieldValue>), Error> {
-        tracing::info!("preparing select statement");
-
         let table_name = T::table_name();
-
         let id_field_name = T::id_field_name();
+
         let select_clause = format!(
-            "SELECT {}.*, {} FROM {}",
+            "SELECT {}.*, {}, TRUE AS _next_page FROM {}",
             self.select_path,
             self.order_by.selects::<T>(),
             table_name
         );
 
         let order_by_references_relation = self.order_by.references_relation();
-
-        tracing::info!("select clause: {}", select_clause);
 
         let mut vars = vec![];
 
@@ -329,6 +319,13 @@ impl<T: Model> Select<T> {
 
         let mut statement = match &self.cursor {
             Some(cursor) => {
+                let inverse_select_clause = format!(
+                    "SELECT {}.*, {}, FALSE AS _next_page FROM {}",
+                    self.select_path,
+                    self.order_by.selects::<T>(),
+                    table_name
+                );
+
                 let mut inverse_predicates = predicates.clone();
 
                 tracing::info!("building cursor filter");
@@ -414,7 +411,7 @@ impl<T: Model> Select<T> {
                             {}
                             {}
                     ",
-                    select_clause,
+                    inverse_select_clause,
                     join_clause,
                     inverse_where_clause,
                     group_by_clause,
@@ -638,11 +635,12 @@ fn split_nodes<T: Model>(
     for node in nodes.into_iter() {
         let c = build_cursor(&node, order_by)?;
 
-        if order_by.is_ascending() && &c >= cursor {
-            next.push(node)
-        } else if !order_by.is_ascending() && &c <= cursor {
-            next.push(node)
-        } else {
+        if &c == cursor || node._next_page {
+            next.push(node);
+            continue;
+        }
+
+        if &c != cursor && !node._next_page {
             prev.push(node)
         }
     }
