@@ -241,6 +241,12 @@ impl<T: Model> Select<T> {
         let mut prev_cursor = None;
 
         let mut page_nodes = if let Some(cursor) = &self.cursor {
+            tracing::info!("BEGIN RETURNED ROWS, COUNT = {}", nodes.len());
+            nodes.iter().for_each(|node| {
+                tracing::debug!("{:?}\n", node._cursor);
+            });
+            tracing::info!("END RETURNED ROWS");
+
             let (prev, next) = split_nodes(nodes, cursor, &self.order_by)?;
 
             prev_cursor = prev
@@ -254,8 +260,6 @@ impl<T: Model> Select<T> {
             nodes
         };
 
-        tracing::warn!("PREV_CURSOR: {:?}", prev_cursor);
-
         match self.limit {
             Some(limit) if (page_nodes.len() as i64) > limit => {
                 let cursor_node = page_nodes.pop().ok_or_else(|| {
@@ -263,8 +267,6 @@ impl<T: Model> Select<T> {
                 })?;
 
                 let next_cursor = build_cursor(&cursor_node, &self.order_by)?;
-
-                tracing::warn!("NEXT_CURSOR: {:?}", next_cursor);
 
                 Ok(Connection {
                     nodes: page_nodes.into_iter().map(|n| n.node).collect(),
