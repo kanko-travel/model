@@ -150,7 +150,7 @@ cake
   .unwrap();
 
 let butter_cakes_with_coconut_flakes = Cake::select()
-  .filter(
+  .with_filter(
     model::Filter::new()
       .field("cake_type").eq(CakeType::ButterCake)
       .and()
@@ -164,14 +164,7 @@ for cake in butter_cakes_with_coconut_flakes.nodes {
   println!("{}", cake.name);
 }
 
-Cake::delete(&cake.id)
-  .execute(&mut conn)
-  .await
-  .unwrap();
-
-Cake::delete(&cake.id)
-  .idempotent()
-  .execute(&mut conn)
+cake.delete().execute(&mut conn)
   .await
   .unwrap();
 ```
