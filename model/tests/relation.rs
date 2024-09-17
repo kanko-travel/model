@@ -3,7 +3,7 @@ use sqlx::{PgConnection, PgPool};
 use uuid::Uuid;
 
 async fn create_db_pool() -> PgPool {
-    PgPool::connect("postgresql://model:model@postgres-model:5432/model")
+    PgPool::connect("postgresql://model:model@postgres:5432/model")
         .await
         .unwrap()
 }
