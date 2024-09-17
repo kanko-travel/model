@@ -3,4 +3,5 @@ steps:
       command: ./test.sh
       plugins:
           - docker-compose#v5.2.0:
+                config: docker-compose.test.yml
                 run: app
