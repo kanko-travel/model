@@ -20,6 +20,22 @@ macro_rules! schema {
     };
 }
 
+#[macro_export]
+macro_rules! schema_entities {
+    ($($t:ty),*) => {
+        {
+            use model::DDL;
+            let mut entities = Vec::new();
+
+            $(
+                entities.extend(<$t>::ddl());
+            )*
+
+            entities
+        }
+    };
+}
+
 pub trait DDL {
     fn ddl() -> Vec<DDLEntity>;
 }
