@@ -15,7 +15,7 @@ macro_rules! schema {
                 entities.extend(<$t>::ddl());
             )*
 
-            model::generate_schema(entities).unwrap()
+            model::generate_schema(&entities).unwrap()
         }
     };
 }
@@ -72,7 +72,7 @@ impl<T: Model> DDL for T {
     }
 }
 
-pub fn generate_schema(entities: Vec<DDLEntity>) -> Result<String, Error> {
+pub fn generate_schema(entities: &Vec<DDLEntity>) -> Result<String, Error> {
     let mut ids = HashSet::new();
 
     let mut ddl = vec![];
