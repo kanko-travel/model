@@ -51,10 +51,17 @@ where
             .collect::<Vec<String>>()
             .join(", ");
 
-        let statement = format!(
-            "INSERT INTO {} ({}) VALUES ({}) ON CONFLICT ON CONSTRAINT {} DO UPDATE SET {} RETURNING *",
-            table_name, columns, placeholder_values, primary_key_index, placeholder_set
-        );
+        let statement = if placeholder_set == "" {
+            format!(
+                "INSERT INTO {} ({}) VALUES ({}) ON CONFLICT ON CONSTRAINT {} DO NOTHING RETURNING *",
+                table_name, columns, placeholder_values, primary_key_index
+            )
+        } else {
+            format!(
+                "INSERT INTO {} ({}) VALUES ({}) ON CONFLICT ON CONSTRAINT {} DO UPDATE SET {} RETURNING *",
+                table_name, columns, placeholder_values, primary_key_index, placeholder_set
+            )
+        };
 
         let var_bindings: Vec<FieldValue> = fields.into_iter().map(|(_, value)| value).collect();
 
