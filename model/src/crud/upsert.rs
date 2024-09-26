@@ -38,19 +38,6 @@ where
 
         let primary_key_index = format!("{}_pkey", table_name);
 
-        // let update_fields = tagged_fields.filter_map(|(i, (def, val))| {
-        //     if def.immutable {
-        //         None
-        //     } else {
-        //         (i, (def, val)).into()
-        //     }
-        // });
-
-        // let placeholder_set = update_fields
-        //     .map(|(i, (def, _))| format!("{} = ${}", def.name, i))
-        //     .collect::<Vec<String>>()
-        //     .join(", ");
-
         let placeholder_set = tagged_fields
             .map(|(i, (def, _))| match def.immutable {
                 true => format!("{} = {}.{}", def.name, table_name, def.name),
@@ -58,18 +45,6 @@ where
             })
             .collect::<Vec<String>>()
             .join(", ");
-
-        // let statement = if placeholder_set == "" {
-        //     format!(
-        //         "INSERT INTO {} ({}) VALUES ({}) ON CONFLICT ON CONSTRAINT {} DO NOTHING RETURNING *",
-        //         table_name, columns, placeholder_values, primary_key_index
-        //     )
-        // } else {
-        //     format!(
-        //         "INSERT INTO {} ({}) VALUES ({}) ON CONFLICT ON CONSTRAINT {} DO UPDATE SET {} RETURNING *",
-        //         table_name, columns, placeholder_values, primary_key_index, placeholder_set
-        //     )
-        // };
 
         let statement = format!(
             "INSERT INTO {} ({}) VALUES ({}) ON CONFLICT ON CONSTRAINT {} DO UPDATE SET {} RETURNING *",
