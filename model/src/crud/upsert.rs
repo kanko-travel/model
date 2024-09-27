@@ -38,16 +38,11 @@ where
 
         let primary_key_index = format!("{}_pkey", table_name);
 
-        let update_fields = tagged_fields.filter_map(|(i, (def, val))| {
-            if def.immutable {
-                None
-            } else {
-                (i, (def, val)).into()
-            }
-        });
-
-        let placeholder_set = update_fields
-            .map(|(i, (def, _))| format!("{} = ${}", def.name, i))
+        let placeholder_set = tagged_fields
+            .map(|(i, (def, _))| match def.immutable {
+                true => format!("{} = {}.{}", def.name, table_name, def.name),
+                false => format!("{} = ${}", def.name, i),
+            })
             .collect::<Vec<String>>()
             .join(", ");
 
