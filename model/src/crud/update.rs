@@ -38,6 +38,10 @@ where
             .collect::<Vec<String>>()
             .join(", ");
 
+        if set_string == "" {
+            return Ok(());
+        }
+
         let statement = format!(
             "UPDATE {} SET {} WHERE {} = $1",
             table_name, set_string, id_field_name
