@@ -47,7 +47,14 @@ impl Error {
 
 impl Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&format!("{:?}", self))
+        let msg = match self {
+            Self::BadRequest(d)
+            | Self::InternalError(d)
+            | Self::NotFound(d)
+            | Self::Unauthorized(d) => d.message.as_str(),
+        };
+
+        f.write_str(&format!("{}", msg))
     }
 }
 
