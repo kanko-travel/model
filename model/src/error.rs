@@ -58,12 +58,14 @@ impl std::error::Error for Error {
 }
 
 impl From<sqlx::Error> for Error {
-    fn from(err: sqlx::Error) -> Self {
-        match err {
-            sqlx::Error::RowNotFound => {
-                Error::not_found("no rows returned from query that expected at least one row")
+    fn from(value: sqlx::Error) -> Self {
+        use sqlx::Error::*;
+        match &value {
+            Tls(_) | Protocol(_) | Io(_) | PoolClosed | WorkerCrashed | PoolTimedOut => {
+                Error::internal(&value.to_string())
             }
-            _ => Error::internal(&err.to_string()),
+            RowNotFound => Error::not_found(&value.to_string()),
+            _ => Error::bad_request(&value.to_string()),
         }
     }
 }
