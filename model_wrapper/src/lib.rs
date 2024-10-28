@@ -42,7 +42,7 @@ pub fn model_wrapper(input: TokenStream) -> TokenStream {
 
         impl ModelWrapper {
             pub fn from_pgoutput(table_name: &str, col_names: &Vec<String>, row: Vec<Option<String>>) -> Result<Self, model::Error> {
-                use model::FromPgoutput;
+                use model::{ Model, FromPgoutput };
 
                 #(#table_name_matches)*
                 Err(model::Error::bad_request(&format!("unknown tablename {}", table_name)))
