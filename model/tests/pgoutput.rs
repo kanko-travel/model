@@ -3,12 +3,11 @@ use uuid::Uuid;
 
 mod models {
     use chrono::{DateTime, NaiveDate, Utc};
-    use model::{model_wrapper, Model};
     use rust_decimal::Decimal;
     use serde::{Deserialize, Serialize};
     use uuid::Uuid;
 
-    #[derive(Serialize, Deserialize, Debug, Clone, Model)]
+    #[derive(Serialize, Deserialize, Debug, Clone, model::Model)]
     #[model(table_name = "test")]
     pub struct Test {
         #[model(id, primary_key)]
@@ -18,7 +17,7 @@ mod models {
         balance: Decimal,
     }
 
-    model_wrapper!(Test);
+    model::model_wrapper!(Test);
 }
 
 #[test]
