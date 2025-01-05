@@ -26,7 +26,7 @@ impl<'a, T: Model> BulkCreate<'a, T> {
             .join(", ");
 
         let statement = format!(
-            "COPY {} ({}) FROM stdin WITH (FORMAT csv, HEADER false)",
+            "COPY {} ({}) FROM stdin WITH (FORMAT csv, HEADER false, NULL 'null')",
             table_name, fields
         );
 

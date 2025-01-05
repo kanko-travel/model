@@ -40,7 +40,7 @@ impl<'a, T: Model> BulkCreateAssociation<'a, T> {
         match relation.reference {
             Reference::Via((junction_table, from_ref, to_ref)) => {
                 let statement = format!(
-                    "COPY {} ({}, {}) FROM stdin WITH (FORMAT csv, HEADER false)",
+                    "COPY {} ({}, {}) FROM stdin WITH (FORMAT csv, HEADER false, NULL 'null')",
                     junction_table, from_ref, to_ref
                 );
 
