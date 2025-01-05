@@ -106,7 +106,7 @@ impl ToString for FieldValue {
             Self::DateTime(Some(inner)) => inner.to_rfc3339(),
             Self::Json(Some(inner)) => inner.to_string(),
             Self::Enum(Some(inner)) => inner.to_string(),
-            _ => "null".to_string(),
+            _ => "\\N".to_string(),
         }
     }
 }

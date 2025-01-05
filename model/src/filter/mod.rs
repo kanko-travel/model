@@ -252,7 +252,8 @@ mod test {
     #[test]
     fn test_null_values() {
         let model_def = definition();
-        let query = r#"(org_id = null || start_date > null) && !(property_id = null || max_occupancy >= null)"#;
+        let query =
+            r#"(org_id = \N || start_date > \N) && !(property_id = \N || max_occupancy >= \N)"#;
 
         ExprParser::new().parse(&model_def, query).unwrap();
     }
@@ -260,7 +261,7 @@ mod test {
     #[test]
     fn test_boolean_values() {
         let model_def = definition();
-        let query = r#"(org_id = null || start_date > null) && !(property_id = null || max_occupancy >= null) && closed = true"#;
+        let query = r#"(org_id = \N || start_date > \N) && !(property_id = \N || max_occupancy >= \N) && closed = true"#;
 
         ExprParser::new().parse(&model_def, query).unwrap();
     }
