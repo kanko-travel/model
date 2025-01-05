@@ -274,3 +274,44 @@ where
         Self::Enum(value.map(|v| v.to_string()))
     }
 }
+
+impl FieldValue {
+    pub fn to_csv_string(&self) -> String {
+        match self {
+            Self::Uuid(Some(inner)) => inner.to_string(),
+            Self::Bool(Some(inner)) => inner.to_string(),
+            Self::Int(Some(inner)) => inner.to_string(),
+            Self::Int32(Some(inner)) => inner.to_string(),
+            Self::Float(Some(inner)) => inner.to_string(),
+            Self::Decimal(Some(inner)) => inner.to_string(),
+            Self::String(Some(inner)) => escape_csv_string(&inner.to_string()),
+            Self::Date(Some(inner)) => inner.to_string(),
+            Self::DateTime(Some(inner)) => inner.to_rfc3339(),
+            Self::Json(Some(inner)) => inner.to_string(),
+            Self::Enum(Some(inner)) => inner.to_string(),
+            _ => "null".to_string(),
+        }
+    }
+}
+
+fn escape_csv_string(field: &str) -> String {
+    let mut escaped = String::new();
+
+    // Check if the field contains special characters like commas, quotes, or newlines
+    if field.contains(',') || field.contains('\n') || field.contains('"') {
+        // Escape double quotes by doubling them
+        escaped.push('"');
+        for ch in field.chars() {
+            if ch == '"' {
+                escaped.push('"'); // Double the quotes
+            } else {
+                escaped.push(ch);
+            }
+        }
+        escaped.push('"');
+    } else {
+        escaped.push_str(field); // No special characters, no need to escape
+    }
+
+    escaped
+}
