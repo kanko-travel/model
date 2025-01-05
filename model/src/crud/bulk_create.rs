@@ -35,7 +35,7 @@ impl<'a, T: Model> BulkCreate<'a, T> {
         for record in self.iterator {
             let values = T::field_definitions()
                 .into_iter()
-                .map(|def| record.field_value(&def.name).unwrap().to_string())
+                .map(|def| record.field_value(&def.name).unwrap().to_csv_string())
                 .collect::<Vec<String>>()
                 .join(",");
 
