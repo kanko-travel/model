@@ -18,7 +18,7 @@ VarName: String = <s:r"[a-zA-Z0-9]+(_[a-zA-Z0-9]+)*([a-zA-Z0-9]+(_[a-zA-Z0-9]+)*
 
 Val: Option<String> = {
 	<s:r#""(\\\\|\\"|[^"\\])*""#> => apply_string_escapes(&s[1..s.len()-1]).into(),
-	"null" => None,
+	"\\N" => None,
 	"true" => String::from("true").into(),
 	"false" => String::from("false").into(),
 }
