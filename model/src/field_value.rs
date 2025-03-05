@@ -287,7 +287,7 @@ impl FieldValue {
             Self::String(Some(inner)) => escape_csv_string(&inner.to_string()),
             Self::Date(Some(inner)) => inner.to_string(),
             Self::DateTime(Some(inner)) => inner.to_rfc3339(),
-            Self::Json(Some(inner)) => inner.to_string(),
+            Self::Json(Some(inner)) => escape_csv_json_string(&inner.to_string()),
             Self::Enum(Some(inner)) => inner.to_string(),
             _ => "null".to_string(),
         }
@@ -314,4 +314,12 @@ fn escape_csv_string(field: &str) -> String {
     }
 
     escaped
+}
+
+fn escape_csv_json_string(field: &str) -> String {
+    // Escape double quotes and newlines for CSV
+    let escaped_str = field.replace('"', "\"\"").replace('\n', "\\n");
+
+    // Wrap the string in double quotes (for CSV compatibility)
+    format!("\"{}\"", escaped_str)
 }
