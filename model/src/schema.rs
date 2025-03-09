@@ -44,6 +44,7 @@ pub enum DDLEntity {
     ForeignKeyConstraint((String, String)),
     Table((String, String)),
     JunctionTable((String, String)),
+    Index((String, String)),
 }
 
 impl DDLEntity {
@@ -51,14 +52,16 @@ impl DDLEntity {
         match self {
             DDLEntity::ForeignKeyConstraint((id, _))
             | DDLEntity::JunctionTable((id, _))
-            | DDLEntity::Table((id, _)) => id.into(),
+            | DDLEntity::Table((id, _))
+            | DDLEntity::Index((id, _)) => id.into(),
         }
     }
     fn ddl(&self) -> String {
         match self {
             DDLEntity::ForeignKeyConstraint((_, ddl))
             | DDLEntity::JunctionTable((_, ddl))
-            | DDLEntity::Table((_, ddl)) => ddl.into(),
+            | DDLEntity::Table((_, ddl))
+            | DDLEntity::Index((_, ddl)) => ddl.into(),
         }
     }
 }
@@ -67,6 +70,7 @@ impl<T: Model> DDL for T {
     fn ddl() -> Vec<DDLEntity> {
         let mut entities = vec![create_table::<T>()];
         entities.extend(create_junction_tables_and_foreign_keys::<T>());
+        entities.extend(create_indices::<T>());
 
         entities
     }
@@ -101,9 +105,112 @@ pub fn generate_schema(entities: &Vec<DDLEntity>) -> Result<String, Error> {
         }
     }
 
+    for entity in entities.iter().filter(|e| matches!(e, DDLEntity::Index(_))) {
+        if ids.insert(entity.id()) {
+            ddl.push(entity.ddl());
+        }
+    }
+
     let ddl = ddl.join("\n\n");
 
     Ok(ddl)
+}
+
+pub fn generate_table_schema(entities: &Vec<DDLEntity>) -> Result<String, Error> {
+    let mut ids = HashSet::new();
+
+    let mut ddl = vec![];
+
+    for entity in entities.iter().filter(|e| matches!(e, DDLEntity::Table(_))) {
+        if ids.insert(entity.id()) {
+            ddl.push(entity.ddl());
+        }
+    }
+
+    for entity in entities
+        .iter()
+        .filter(|e| matches!(e, DDLEntity::JunctionTable(_)))
+    {
+        if ids.insert(entity.id()) {
+            ddl.push(entity.ddl());
+        }
+    }
+
+    let ddl = ddl.join("\n\n");
+
+    Ok(ddl)
+}
+
+pub fn generate_fkey_schema(entities: &Vec<DDLEntity>) -> Result<String, Error> {
+    let mut ids = HashSet::new();
+
+    let mut ddl = vec![];
+
+    for entity in entities
+        .iter()
+        .filter(|e| matches!(e, DDLEntity::ForeignKeyConstraint(_)))
+    {
+        if ids.insert(entity.id()) {
+            ddl.push(entity.ddl());
+        }
+    }
+
+    let ddl = ddl.join("\n\n");
+
+    Ok(ddl)
+}
+
+pub fn generate_index_schema(entities: &Vec<DDLEntity>) -> Result<String, Error> {
+    let mut ids = HashSet::new();
+
+    let mut ddl = vec![];
+
+    for entity in entities.iter().filter(|e| matches!(e, DDLEntity::Index(_))) {
+        if ids.insert(entity.id()) {
+            ddl.push(entity.ddl());
+        }
+    }
+
+    let ddl = ddl.join("\n\n");
+
+    Ok(ddl)
+}
+
+fn create_table<T: Model>() -> DDLEntity {
+    let table_name = T::table_name();
+    let field_definitions = T::field_definitions();
+
+    let columns = field_definitions
+        .iter()
+        .map(|def| {
+            let mut col = format!("{} {}", def.name, def.type_.sql_type());
+
+            if !def.nullable {
+                col = format!("{} {}", col, "NOT NULL");
+            }
+
+            if def.unique {
+                col = format!("{} {}", col, "UNIQUE");
+            }
+
+            col
+        })
+        .collect::<Vec<String>>()
+        .join(", ");
+
+    let primary_key = field_definitions
+        .iter()
+        .filter(|def| def.primary_key)
+        .map(|def| def.name.as_str())
+        .collect::<Vec<&str>>()
+        .join(", ");
+
+    let statement = format!(
+        "CREATE TABLE {} ({}, PRIMARY KEY ({}));",
+        table_name, columns, primary_key
+    );
+
+    DDLEntity::Table((table_name, statement))
 }
 
 fn create_junction_tables_and_foreign_keys<T: Model>() -> Vec<DDLEntity> {
@@ -166,39 +273,23 @@ fn create_junction_tables_and_foreign_keys<T: Model>() -> Vec<DDLEntity> {
     entities
 }
 
-fn create_table<T: Model>() -> DDLEntity {
-    let table_name = T::table_name();
-    let field_definitions = T::field_definitions();
+fn create_indices<T: Model>() -> Vec<DDLEntity> {
+    let indices = T::index_definitions();
 
-    let columns = field_definitions
-        .iter()
+    indices
+        .into_iter()
         .map(|def| {
-            let mut col = format!("{} {}", def.name, def.type_.sql_type());
+            let table_name = T::table_name();
+            let idx_name = format!("idx_{}_{}", table_name, def.name);
 
-            if !def.nullable {
-                col = format!("{} {}", col, "NOT NULL");
-            }
+            let columns_string = def.columns.join(", ");
 
-            if def.unique {
-                col = format!("{} {}", col, "UNIQUE");
-            }
+            let statement = format!(
+                "CREATE INDEX {} ON {} ({})",
+                idx_name, table_name, columns_string,
+            );
 
-            col
+            DDLEntity::Index((idx_name, statement))
         })
-        .collect::<Vec<String>>()
-        .join(", ");
-
-    let primary_key = field_definitions
-        .iter()
-        .filter(|def| def.primary_key)
-        .map(|def| def.name.as_str())
-        .collect::<Vec<&str>>()
-        .join(", ");
-
-    let statement = format!(
-        "CREATE TABLE {} ({}, PRIMARY KEY ({}));",
-        table_name, columns, primary_key
-    );
-
-    DDLEntity::Table((table_name, statement))
+        .collect()
 }

@@ -15,6 +15,7 @@ pub fn model_derive(input: TokenStream) -> TokenStream {
     let (impl_generics, type_generics, where_clause) = input.generics.split_for_impl();
 
     let mut has_relations = false;
+    let mut has_indices = false;
 
     // Initialize the table name to a default or error message in case attribute is not found
     let mut table_name = None;
@@ -27,6 +28,9 @@ pub fn model_derive(input: TokenStream) -> TokenStream {
                     match nested_meta {
                         NestedMeta::Meta(Meta::Path(path)) if path.is_ident("has_relations") => {
                             has_relations = true;
+                        }
+                        NestedMeta::Meta(Meta::Path(path)) if path.is_ident("has_indices") => {
+                            has_indices = true;
                         }
                         NestedMeta::Meta(Meta::NameValue(MetaNameValue {
                             path,
@@ -189,10 +193,20 @@ pub fn model_derive(input: TokenStream) -> TokenStream {
         }
     };
 
+    let indexed_impl = if has_indices {
+        quote! {}
+    } else {
+        quote! {
+            impl #impl_generics model::Indexed for #ident #type_generics #where_clause {}
+        }
+    };
+
     let out = quote! {
         #model_impl
 
         #related_impl
+
+        #indexed_impl
     };
 
     out.into()

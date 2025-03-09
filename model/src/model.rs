@@ -6,12 +6,13 @@ use std::collections::HashMap;
 use std::str::FromStr;
 use uuid::Uuid;
 
+use crate::index::Indexed;
 use crate::relation::RelationDef;
 use crate::Error;
 use crate::FieldValue;
 use crate::Related;
 
-pub trait Model: Related {
+pub trait Model: Related + Indexed {
     fn table_name() -> String;
     fn id_field_name() -> String;
     fn field_definitions() -> Vec<FieldDefinition>;
