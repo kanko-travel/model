@@ -305,7 +305,7 @@ fn create_indices<T: Model>() -> Vec<DDLEntity> {
             let columns_string = def.columns.join(", ");
 
             let statement = format!(
-                "CREATE INDEX {} ON {} ({})",
+                "CREATE INDEX {} ON {} ({});",
                 idx_name, table_name, columns_string,
             );
 
