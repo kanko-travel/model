@@ -21,6 +21,26 @@ macro_rules! schema {
 }
 
 #[macro_export]
+macro_rules! schema_parts {
+    ($($t:ty),*) => {
+        {
+            use model::DDL;
+            let mut entities = Vec::new();
+
+            $(
+                entities.extend(<$t>::ddl());
+            )*
+
+            (
+                model::generate_table_schema(&entities).unwrap(),
+                model::generate_fkey_schema(&entities).unwrap(),
+                model::generate_index_schema(&entities).unwrap()
+            )
+        }
+    };
+}
+
+#[macro_export]
 macro_rules! schema_entities {
     ($($t:ty),*) => {
         {
