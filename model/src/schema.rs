@@ -305,21 +305,40 @@ fn create_indices<T: Model>() -> Vec<DDLEntity> {
 
             let index_type = match def.type_ {
                 IndexType::BTree => "btree",
-                IndexType::Fulltext | IndexType::Trigram => "gin",
+                IndexType::Fulltext
+                | IndexType::JsonFulltext
+                | IndexType::Trigram
+                | IndexType::ListTrigram => "gin",
             };
 
             let columns_string = match def.type_ {
                 IndexType::BTree => def.columns.join(", "),
+
                 IndexType::Fulltext => def
                     .columns
                     .iter()
                     .map(|c| format!("to_tsvector('english', {})", c))
                     .collect::<Vec<_>>()
                     .join(", "),
+
+                IndexType::JsonFulltext => def
+                    .columns
+                    .iter()
+                    .map(|c| format!("jsonb_to_tsvector('english', {})", c))
+                    .collect::<Vec<_>>()
+                    .join(", "),
+
                 IndexType::Trigram => def
                     .columns
                     .iter()
                     .map(|c| format!("{} gin_trgm_ops", c))
+                    .collect::<Vec<_>>()
+                    .join(", "),
+
+                IndexType::ListTrigram => def
+                    .columns
+                    .iter()
+                    .map(|c| format!("jsonb_array_elements_text({}) gin_trgm_ops", c))
                     .collect::<Vec<_>>()
                     .join(", "),
             };

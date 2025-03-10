@@ -7,7 +7,9 @@ pub trait Indexed {
 pub enum IndexType {
     BTree,
     Fulltext,
+    JsonFulltext,
     Trigram,
+    ListTrigram,
 }
 
 pub struct IndexDef {
