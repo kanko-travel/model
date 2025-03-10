@@ -334,7 +334,7 @@ fn create_indices<T: Model>() -> Result<Vec<DDLEntity>, Error> {
                     FieldType::String | FieldType::Json => {}
                     _ => {
                         return Err(Error::bad_request(
-                            "only string and json columns are valid in a fulltext index",
+                            "only string, enum and json columns are valid in a fulltext index",
                         ))
                     }
                 },
