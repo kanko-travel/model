@@ -13,10 +13,10 @@ macro_rules! schema {
             let mut entities = Vec::new();
 
             $(
-                entities.extend(<$t>::ddl());
+                entities.extend(<$t>::ddl().unwrap());
             )*
 
-            model::generate_schema(&entities).unwrap()
+            model::generate_schema(&entities)
         }
     };
 }
@@ -29,13 +29,13 @@ macro_rules! schema_parts {
             let mut entities = Vec::new();
 
             $(
-                entities.extend(<$t>::ddl());
+                entities.extend(<$t>::ddl().unwrap());
             )*
 
             (
-                model::generate_table_schema(&entities).unwrap(),
-                model::generate_fkey_schema(&entities).unwrap(),
-                model::generate_index_schema(&entities).unwrap()
+                model::generate_table_schema(&entities),
+                model::generate_fkey_schema(&entities),
+                model::generate_index_schema(&entities)
             )
         }
     };
@@ -49,7 +49,7 @@ macro_rules! schema_entities {
             let mut entities = Vec::new();
 
             $(
-                entities.extend(<$t>::ddl());
+                entities.extend(<$t>::ddl().unwrap());
             )*
 
             entities
@@ -58,7 +58,7 @@ macro_rules! schema_entities {
 }
 
 pub trait DDL {
-    fn ddl() -> Vec<DDLEntity>;
+    fn ddl() -> Result<Vec<DDLEntity>, Error>;
 }
 
 pub enum DDLEntity {
@@ -88,16 +88,16 @@ impl DDLEntity {
 }
 
 impl<T: Model> DDL for T {
-    fn ddl() -> Vec<DDLEntity> {
-        let mut entities = vec![create_table::<T>()];
-        entities.extend(create_junction_tables_and_foreign_keys::<T>());
-        entities.extend(create_indices::<T>());
+    fn ddl() -> Result<Vec<DDLEntity>, Error> {
+        let mut entities = vec![create_table::<T>()?];
+        entities.extend(create_junction_tables_and_foreign_keys::<T>()?);
+        entities.extend(create_indices::<T>()?);
 
-        entities
+        Ok(entities)
     }
 }
 
-pub fn generate_schema(entities: &Vec<DDLEntity>) -> Result<String, Error> {
+pub fn generate_schema(entities: &Vec<DDLEntity>) -> String {
     let mut ids = HashSet::new();
 
     let mut ddl = vec![];
@@ -134,10 +134,10 @@ pub fn generate_schema(entities: &Vec<DDLEntity>) -> Result<String, Error> {
 
     let ddl = ddl.join("\n\n");
 
-    Ok(ddl)
+    ddl
 }
 
-pub fn generate_table_schema(entities: &Vec<DDLEntity>) -> Result<String, Error> {
+pub fn generate_table_schema(entities: &Vec<DDLEntity>) -> String {
     let mut ids = HashSet::new();
 
     let mut ddl = vec![];
@@ -159,10 +159,10 @@ pub fn generate_table_schema(entities: &Vec<DDLEntity>) -> Result<String, Error>
 
     let ddl = ddl.join("\n\n");
 
-    Ok(ddl)
+    ddl
 }
 
-pub fn generate_fkey_schema(entities: &Vec<DDLEntity>) -> Result<String, Error> {
+pub fn generate_fkey_schema(entities: &Vec<DDLEntity>) -> String {
     let mut ids = HashSet::new();
 
     let mut ddl = vec![];
@@ -178,10 +178,10 @@ pub fn generate_fkey_schema(entities: &Vec<DDLEntity>) -> Result<String, Error> 
 
     let ddl = ddl.join("\n\n");
 
-    Ok(ddl)
+    ddl
 }
 
-pub fn generate_index_schema(entities: &Vec<DDLEntity>) -> Result<String, Error> {
+pub fn generate_index_schema(entities: &Vec<DDLEntity>) -> String {
     let mut ids = HashSet::new();
 
     let mut ddl = vec![];
@@ -194,10 +194,10 @@ pub fn generate_index_schema(entities: &Vec<DDLEntity>) -> Result<String, Error>
 
     let ddl = ddl.join("\n\n");
 
-    Ok(ddl)
+    ddl
 }
 
-fn create_table<T: Model>() -> DDLEntity {
+fn create_table<T: Model>() -> Result<DDLEntity, Error> {
     let table_name = T::table_name();
     let field_definitions = T::field_definitions();
 
@@ -231,10 +231,10 @@ fn create_table<T: Model>() -> DDLEntity {
         table_name, columns, primary_key
     );
 
-    DDLEntity::Table((table_name, statement))
+    Ok(DDLEntity::Table((table_name, statement)))
 }
 
-fn create_junction_tables_and_foreign_keys<T: Model>() -> Vec<DDLEntity> {
+fn create_junction_tables_and_foreign_keys<T: Model>() -> Result<Vec<DDLEntity>, Error> {
     let relation_defs = T::relation_definitions();
 
     let mut entities = vec![];
@@ -291,13 +291,13 @@ fn create_junction_tables_and_foreign_keys<T: Model>() -> Vec<DDLEntity> {
         }
     }
 
-    entities
+    Ok(entities)
 }
 
-fn create_indices<T: Model>() -> Vec<DDLEntity> {
+fn create_indices<T: Model>() -> Result<Vec<DDLEntity>, Error> {
     let indices = T::index_definitions();
 
-    indices
+    let indices = indices
         .into_iter()
         .map(|def| {
             let table_name = T::table_name();
@@ -305,7 +305,7 @@ fn create_indices<T: Model>() -> Vec<DDLEntity> {
 
             let index_type = match def.type_ {
                 IndexType::BTree => "btree",
-                IndexType::Fulltext | IndexType::Trigram => "gin",
+                IndexType::Fulltext | IndexType::FulltextEnglish => "gin",
             };
 
             let columns_string = match def.type_ {
@@ -314,14 +314,14 @@ fn create_indices<T: Model>() -> Vec<DDLEntity> {
                 IndexType::Fulltext => def
                     .columns
                     .iter()
-                    .map(|c| format!("to_tsvector('english', {})", c))
+                    .map(|c| format!("to_tsvector('simple', {})", c))
                     .collect::<Vec<_>>()
                     .join(", "),
 
-                IndexType::Trigram => def
+                IndexType::FulltextEnglish => def
                     .columns
                     .iter()
-                    .map(|c| format!("({}::text) gin_trgm_ops", c))
+                    .map(|c| format!("to_tsvector('english', {})", c))
                     .collect::<Vec<_>>()
                     .join(", "),
             };
@@ -333,5 +333,7 @@ fn create_indices<T: Model>() -> Vec<DDLEntity> {
 
             DDLEntity::Index((idx_name, statement))
         })
-        .collect()
+        .collect::<Vec<_>>();
+
+    Ok(indices)
 }

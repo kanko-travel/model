@@ -7,7 +7,7 @@ pub trait Indexed {
 pub enum IndexType {
     BTree,
     Fulltext,
-    Trigram,
+    FulltextEnglish,
 }
 
 pub struct IndexDef {
@@ -35,8 +35,8 @@ impl IndexDef {
         self
     }
 
-    pub fn trigram(mut self) -> Self {
-        self.type_ = IndexType::Trigram;
+    pub fn fulltext_english(mut self) -> Self {
+        self.type_ = IndexType::FulltextEnglish;
         self
     }
 }
