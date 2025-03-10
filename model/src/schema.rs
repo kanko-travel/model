@@ -314,14 +314,14 @@ fn create_indices<T: Model>() -> Vec<DDLEntity> {
                 IndexType::Fulltext => def
                     .columns
                     .iter()
-                    .map(|c| format!("to_tsvector('english', {}::text)", c))
+                    .map(|c| format!("to_tsvector('english', {})", c))
                     .collect::<Vec<_>>()
                     .join(", "),
 
                 IndexType::Trigram => def
                     .columns
                     .iter()
-                    .map(|c| format!("{}::text gin_trgm_ops", c))
+                    .map(|c| format!("{} gin_trgm_ops", c))
                     .collect::<Vec<_>>()
                     .join(", "),
             };
