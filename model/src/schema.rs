@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 
+use crate::index::IndexType;
 use crate::relation::Reference;
 use crate::Error;
 use crate::Model;
@@ -302,11 +303,30 @@ fn create_indices<T: Model>() -> Vec<DDLEntity> {
             let table_name = T::table_name();
             let idx_name = format!("idx_{}_{}", table_name, def.name);
 
-            let columns_string = def.columns.join(", ");
+            let index_type = match def.type_ {
+                IndexType::BTree => "btree",
+                IndexType::Fulltext | IndexType::Trigram => "gin",
+            };
+
+            let columns_string = match def.type_ {
+                IndexType::BTree => def.columns.join(", "),
+                IndexType::Fulltext => def
+                    .columns
+                    .iter()
+                    .map(|c| format!("to_tsvector('english', {})", c))
+                    .collect::<Vec<_>>()
+                    .join(", "),
+                IndexType::Trigram => def
+                    .columns
+                    .iter()
+                    .map(|c| format!("{} gin_trgm_ops", c))
+                    .collect::<Vec<_>>()
+                    .join(", "),
+            };
 
             let statement = format!(
-                "CREATE INDEX {} ON {} ({});",
-                idx_name, table_name, columns_string,
+                "CREATE INDEX {} ON {} USING {} ({});",
+                idx_name, table_name, index_type, columns_string,
             );
 
             DDLEntity::Index((idx_name, statement))
