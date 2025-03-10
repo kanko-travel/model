@@ -3,6 +3,7 @@ use std::collections::HashSet;
 use crate::index::IndexType;
 use crate::relation::Reference;
 use crate::Error;
+use crate::FieldType;
 use crate::Model;
 
 #[macro_export]
@@ -295,45 +296,76 @@ fn create_junction_tables_and_foreign_keys<T: Model>() -> Result<Vec<DDLEntity>,
 }
 
 fn create_indices<T: Model>() -> Result<Vec<DDLEntity>, Error> {
+    let mut ddls = vec![];
+
     let indices = T::index_definitions();
 
-    let indices = indices
-        .into_iter()
-        .map(|def| {
-            let table_name = T::table_name();
-            let idx_name = format!("idx_{}_{}", table_name, def.name);
+    for def in &indices {
+        let table_name = T::table_name();
+        let idx_name = format!("idx_{}_{}", table_name, def.name);
 
-            let index_type = match def.type_ {
-                IndexType::BTree => "btree",
-                IndexType::Fulltext | IndexType::FulltextEnglish => "gin",
-            };
+        let index_type = match def.type_ {
+            IndexType::BTree => "btree",
+            IndexType::Fulltext | IndexType::FulltextEnglish => "gin",
+        };
 
-            let columns_string = match def.type_ {
-                IndexType::BTree => def.columns.join(", "),
+        let field_defs = T::field_definitions();
 
-                IndexType::Fulltext => def
-                    .columns
-                    .iter()
-                    .map(|c| format!("to_tsvector('simple', {})", c))
-                    .collect::<Vec<_>>()
-                    .join(", "),
+        // perform some basic validation of columns and corresponding types
+        if (matches!(def.type_, IndexType::Fulltext)
+            || matches!(def.type_, IndexType::FulltextEnglish))
+            && def.columns.len() != 1
+        {
+            return Err(Error::bad_request(
+                "exactly one column must be specified for a fulltext index",
+            ));
+        }
 
-                IndexType::FulltextEnglish => def
-                    .columns
-                    .iter()
-                    .map(|c| format!("to_tsvector('english', {})", c))
-                    .collect::<Vec<_>>()
-                    .join(", "),
-            };
+        for column in &def.columns {
+            let fdef = field_defs
+                .iter()
+                .find(|fdef| &fdef.name == column)
+                .ok_or_else(|| {
+                    Error::bad_request("invalid column in index: column is not defined in model")
+                })?;
 
-            let statement = format!(
-                "CREATE INDEX {} ON {} USING {} ({});",
-                idx_name, table_name, index_type, columns_string,
-            );
+            match def.type_ {
+                IndexType::Fulltext | IndexType::FulltextEnglish => match fdef.type_ {
+                    FieldType::String | FieldType::Json => {}
+                    _ => {
+                        return Err(Error::bad_request(
+                            "only string and json columns are valid in a fulltext index",
+                        ))
+                    }
+                },
+                _ => {}
+            }
+        }
 
-            DDLEntity::Index((idx_name, statement))
-        })
-        .collect::<Vec<_>>();
+        let columns_string = match def.type_ {
+            IndexType::BTree => def.columns.join(", "),
+            IndexType::Fulltext => def
+                .columns
+                .iter()
+                .map(|c| format!("to_tsvector('simple', {})", c))
+                .collect::<Vec<_>>()
+                .join(", "),
 
-    Ok(indices)
+            IndexType::FulltextEnglish => def
+                .columns
+                .iter()
+                .map(|c| format!("to_tsvector('english', {})", c))
+                .collect::<Vec<_>>()
+                .join(", "),
+        };
+
+        let statement = format!(
+            "CREATE INDEX {} ON {} USING {} ({});",
+            idx_name, table_name, index_type, columns_string,
+        );
+
+        ddls.push(DDLEntity::Index((idx_name, statement)));
+    }
+
+    Ok(ddls)
 }
