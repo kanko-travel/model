@@ -37,8 +37,18 @@ impl IndexDef {
         self
     }
 
+    pub fn json_fulltext(mut self) -> Self {
+        self.type_ = IndexType::JsonFulltext;
+        self
+    }
+
     pub fn trigram(mut self) -> Self {
         self.type_ = IndexType::Trigram;
+        self
+    }
+
+    pub fn list_trigram(mut self) -> Self {
+        self.type_ = IndexType::ListTrigram;
         self
     }
 }
