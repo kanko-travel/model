@@ -321,7 +321,7 @@ fn create_indices<T: Model>() -> Vec<DDLEntity> {
                 IndexType::Trigram => def
                     .columns
                     .iter()
-                    .map(|c| format!("{} gin_trgm_ops", c))
+                    .map(|c| format!("({}::text) gin_trgm_ops", c))
                     .collect::<Vec<_>>()
                     .join(", "),
             };
